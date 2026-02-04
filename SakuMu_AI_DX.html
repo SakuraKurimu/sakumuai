@@ -1,0 +1,3725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樱梦DX AI - 多功能AI助手平台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #7c3aed;
+            --primary-light: #8b5cf6;
+            --secondary-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+            --background-dark: #0f172a;
+            --background-card: #1e293b;
+            --background-sidebar: #111827;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background-color: var(--background-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        }
+        
+        .login-box {
+            background-color: var(--background-card);
+            border-radius: 15px;
+            padding: 40px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+        }
+        
+        .login-title {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, var(--primary-color), #ec4899);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .login-tabs {
+            display: flex;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .login-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .login-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+        
+        .login-form {
+            display: none;
+        }
+        
+        .login-form.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--background-sidebar);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(90deg, var(--primary-light), var(--primary-color));
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(124, 58, 237, 0.3);
+        }
+        
+        .btn-block {
+            width: 100%;
+        }
+        
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background-color: var(--background-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .app-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .app-logo i {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+        }
+        
+        .app-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--primary-color), #ec4899);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .mode-section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .section-title i.fa-chevron-down {
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+            transform: rotate(-90deg);
+        }
+        
+        .section-title.collapsed i.fa-chevron-down {
+            transform: rotate(0deg);
+        }
+        
+        .mode-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-list.collapsed {
+            height: 0;
+            opacity: 0;
+        }
+        
+        .mode-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        
+        .mode-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .mode-item.active {
+            background-color: rgba(124, 58, 237, 0.2);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .mode-icon {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            width: 24px;
+            text-align: center;
+        }
+        
+        .mode-item.active .mode-icon {
+            color: var(--primary-color);
+        }
+        
+        .mode-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .battery-info {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .battery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .battery-title {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .battery-amount {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+        }
+        
+        .battery-low {
+            color: var(--danger-color);
+        }
+        
+        .battery-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .current-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 10px;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 5px;
+        }
+        
+        .btn-success {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #0da271;
+        }
+        
+        .btn-info {
+            background-color: var(--info-color);
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background-color: #2563eb;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .main-header {
+            padding: 18px 25px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--background-card);
+        }
+        
+        .current-mode {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .btn-secondary {
+            background-color: var(--background-sidebar);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .conversation-sidebar {
+            width: 300px;
+            background-color: var(--background-sidebar);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .conversation-header {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .conversation-item {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+        
+        .conversation-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .conversation-item.active {
+            background-color: rgba(124, 58, 237, 0.15);
+        }
+        
+        .conversation-title {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+        
+        .conversation-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+        
+        .conversation-actions {
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .conversation-item:hover .conversation-actions {
+            opacity: 1;
+        }
+        
+        .conversation-action-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .conversation-action-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+        
+        .chat-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .message {
+            max-width: 85%;
+            padding: 15px;
+            border-radius: 12px;
+            line-height: 1.5;
+        }
+        
+        .user-message {
+            align-self: flex-end;
+            background-color: rgba(124, 58, 237, 0.2);
+            border: 1px solid rgba(124, 58, 237, 0.3);
+        }
+        
+        .ai-message {
+            align-self: flex-start;
+            background-color: rgba(30, 41, 59, 0.7);
+            border: 1px solid var(--border-color);
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .message-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .message-content h1,
+        .message-content h2,
+        .message-content h3,
+        .message-content h4,
+        .message-content h5,
+        .message-content h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        .message-content h1 {
+            font-size: 1.5em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+        
+        .message-content h2 {
+            font-size: 1.3em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+        
+        .message-content h3 {
+            font-size: 1.1em;
+        }
+        
+        .message-content strong {
+            font-weight: 700;
+        }
+        
+        .message-content em {
+            font-style: italic;
+        }
+        
+        .message-content code {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .message-content pre {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .message-content pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+        }
+        
+        .message-content ul,
+        .message-content ol {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+        
+        .message-content li {
+            margin-bottom: 5px;
+        }
+        
+        .message-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 15px;
+            margin: 10px 0;
+            color: var(--text-secondary);
+        }
+        
+        .message-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        .input-container {
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--background-card);
+        }
+        
+        .cost-estimate {
+            padding: 8px 12px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .cost-estimate-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .cost-label {
+            color: var(--text-secondary);
+        }
+        
+        .cost-value {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .cost-value.warning {
+            color: var(--warning-color);
+        }
+        
+        .cost-value.danger {
+            color: var(--danger-color);
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background-color: var(--background-sidebar);
+            color: var(--text-primary);
+            font-size: 1rem;
+            resize: none;
+            min-height: 50px;
+            max-height: 150px;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .send-button {
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .send-button:hover {
+            background-color: var(--primary-light);
+        }
+        
+        .send-button:disabled {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+        }
+        
+        .settings-panel {
+            position: absolute;
+            top: 70px;
+            right: 25px;
+            width: 350px;
+            background-color: var(--background-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            display: none;
+            padding: 20px;
+        }
+        
+        .settings-panel.active {
+            display: block;
+        }
+        
+        .settings-title {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .settings-group {
+            margin-bottom: 20px;
+        }
+        
+        .settings-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .settings-value {
+            display: inline-block;
+            min-width: 30px;
+            text-align: center;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .settings-slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-color);
+            border-radius: 3px;
+            outline: none;
+            margin-bottom: 10px;
+        }
+        
+        .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        .context-cost-info {
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .battery-summary {
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .battery-summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .battery-summary-total {
+            font-weight: 700;
+            color: var(--primary-color);
+            border-top: 1px solid var(--border-color);
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background-color: var(--background-card);
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .api-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .api-item {
+            padding: 12px 15px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.03);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .api-item.active {
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .api-name {
+            font-weight: 500;
+        }
+        
+        .api-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .preset-list {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .preset-item {
+            padding: 12px 15px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.03);
+            margin-bottom: 10px;
+            border-left: 3px solid var(--info-color);
+        }
+        
+        .preset-item-title {
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .preset-item-content {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        .recharge-code-input {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+        
+        .recharge-info {
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .recharge-info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .warning-modal .modal-content {
+            border-color: var(--danger-color);
+            max-width: 450px;
+        }
+        
+        .warning-header {
+            color: var(--danger-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .warning-body {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        
+        .warning-icon {
+            font-size: 3rem;
+            color: var(--danger-color);
+            margin-bottom: 20px;
+        }
+        
+        .warning-text {
+            font-size: 1.1rem;
+            margin-bottom: 25px;
+            color: var(--text-primary);
+        }
+        
+        .warning-timer {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--danger-color);
+            margin-bottom: 25px;
+        }
+        
+        .warning-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .warning-actions .btn {
+            flex: 1;
+        }
+        
+        @media (max-width: 1024px) {
+            .conversation-sidebar {
+                width: 250px;
+            }
+            
+            .settings-panel {
+                width: 300px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                z-index: 100;
+                height: 100vh;
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .conversation-sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                z-index: 99;
+                transform: translateX(-100%);
+            }
+            
+            .conversation-sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .menu-toggle {
+                display: block;
+            }
+            
+            .settings-panel {
+                width: 90%;
+                right: 5%;
+            }
+        }
+        
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            color: var(--text-secondary);
+        }
+        
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+        
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            animation: dot-flashing 1.4s infinite alternate;
+        }
+        
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes dot-flashing {
+            0% {
+                opacity: 0.2;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1001;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background-color: var(--danger-color);
+        }
+        
+        .notification.success {
+            background-color: var(--secondary-color);
+        }
+        
+        .notification.warning {
+            background-color: var(--warning-color);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .user-info:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), #ec4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        .user-email {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        
+        .logout-btn:hover {
+            color: var(--danger-color);
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+        
+        .preset-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+        }
+        
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-color);
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .preset-select {
+            margin-bottom: 15px;
+        }
+        
+        .preset-select .form-control {
+            font-size: 0.9rem;
+            padding: 8px 12px;
+        }
+        
+        .nickname-status {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .nickname-status.enabled {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: var(--secondary-color);
+        }
+        
+        .nickname-status.disabled {
+            background-color: rgba(148, 163, 184, 0.2);
+            color: var(--text-secondary);
+        }
+        
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .preset-buttons .btn {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <h1 class="login-title">樱梦DX AI</h1>
+            
+            <div class="login-tabs">
+                <div class="login-tab active" data-tab="login">登录</div>
+                <div class="login-tab" data-tab="register">注册</div>
+            </div>
+            
+            <form id="loginForm" class="login-form active">
+                <div class="form-group">
+                    <label class="form-label" for="loginEmail">邮箱</label>
+                    <input type="email" class="form-control" id="loginEmail" placeholder="请输入邮箱" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">账号</label>
+                    <input type="text" class="form-control" id="loginUsername" placeholder="请输入账号" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">密码</label>
+                    <input type="password" class="form-control" id="loginPassword" placeholder="请输入密码" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i>
+                    登录
+                </button>
+                
+                <div class="login-footer">
+                    首次使用？请先注册账号
+                </div>
+            </form>
+            
+            <form id="registerForm" class="login-form">
+                <div class="form-group">
+                    <label class="form-label" for="registerEmail">邮箱</label>
+                    <input type="email" class="form-control" id="registerEmail" placeholder="请输入邮箱" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="registerUsername">账号</label>
+                    <input type="text" class="form-control" id="registerUsername" placeholder="请输入账号" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="registerPassword">密码</label>
+                    <input type="password" class="form-control" id="registerPassword" placeholder="请输入密码" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">确认密码</label>
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="请再次输入密码" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-user-plus"></i>
+                    注册
+                </button>
+                
+                <div class="login-footer">
+                    已有账号？请直接登录
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="app-container" id="appContainer">
+        <div class="sidebar active" id="sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo">
+                    <i class="fas fa-robot"></i>
+                    <span class="app-name">樱梦DX AI</span>
+                </div>
+            </div>
+            
+            <div class="user-info" id="userInfo">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">用户</div>
+                    <div class="user-email" id="userEmail">user@example.com</div>
+                </div>
+                <button class="logout-btn" id="logoutBtn" title="退出登录">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="mode-section">
+                    <div class="section-title" id="recentConversationsTitle">
+                        <i class="fas fa-chevron-down"></i>
+                        <span>最近对话</span>
+                    </div>
+                    <div class="mode-list collapsed" id="recentConversations">
+                    </div>
+                </div>
+                
+                <div class="mode-section">
+                    <div class="section-title">
+                        <i class="fas fa-comments"></i>
+                        <span>AI 模式</span>
+                    </div>
+                    <div class="mode-list">
+                        <a href="#" class="mode-item active" data-mode="chat">
+                            <div class="mode-icon">
+                                <i class="fas fa-comment-dots"></i>
+                            </div>
+                            <div class="mode-name">文字对话</div>
+                        </a>
+                        <a href="#" class="mode-item" data-mode="document">
+                            <div class="mode-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="mode-name">文档分析</div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="battery-info">
+                <div class="battery-header">
+                    <div class="battery-title">
+                        <i class="fas fa-battery-full"></i>
+                        <span>电池</span>
+                    </div>
+                    <div class="battery-amount" id="batteryAmount">0.000</div>
+                </div>
+                
+                <div class="current-time" id="currentTime"></div>
+                
+                <div class="battery-actions">
+                    <button class="btn btn-success btn-block" id="rechargeBtn">
+                        <i class="fas fa-bolt"></i>
+                        充值
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="main-header">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <div class="current-mode" id="currentMode">文字对话</div>
+                
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="presetManagementBtn">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>人物预设</span>
+                        <span class="nickname-status disabled" id="presetStatusDisplay">待机中</span>
+                    </button>
+                    <button class="btn btn-info" id="settingsBtn">
+                        <i class="fas fa-cog"></i>
+                        <span>设置</span>
+                    </button>
+                </div>
+                
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="settings-title">
+                        <span>设置</span>
+                        <button class="btn btn-secondary btn-sm" id="closeSettingsBtn" style="padding: 4px 8px;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label class="settings-label">对话温度设置: <span class="settings-value" id="temperatureValue">0.7</span></label>
+                        <input type="range" min="0" max="1.5" step="0.1" value="0.7" class="settings-slider" id="temperatureSlider">
+                    </div>
+                    
+                    <div class="settings-group">
+                        <label class="settings-label">上下文关联长度: <span class="settings-value" id="contextValue">7</span></label>
+                        <input type="range" min="0" max="25" value="7" class="settings-slider" id="contextSlider">
+                        <div class="context-cost-info">
+                            <div>当前上下文预估消耗: <span id="contextCostEstimate">0.000</span> 电池</div>
+                            <div>预估tokens: <span id="contextTokensEstimate">0</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="battery-summary">
+                        <div class="battery-summary-item">
+                            <span>当前对话消耗:</span>
+                            <span id="currentConversationCost">0.000</span>
+                        </div>
+                        <div class="battery-summary-item">
+                            <span>今日消耗:</span>
+                            <span id="todayCost">0.000</span>
+                        </div>
+                        <div class="battery-summary-item battery-summary-total">
+                            <span>总消耗:</span>
+                            <span id="totalCost">0.000</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="exportConversationBtn" style="width: 100%; margin-top: 15px;">
+                        <i class="fas fa-download"></i>
+                        导出当前对话
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chat-container">
+                <div class="conversation-sidebar" id="conversationSidebar">
+                    <div class="conversation-header">
+                        <button class="btn btn-primary" style="width: 100%;" id="newConversationSidebarBtn">
+                            <i class="fas fa-plus"></i>
+                            <span>新对话</span>
+                        </button>
+                    </div>
+                    
+                    <div class="conversation-list" id="conversationList">
+                    </div>
+                </div>
+                
+                <div class="chat-window">
+                    <div class="document-upload" id="documentUpload" style="display: none;">
+                        <i class="fas fa-cloud-upload-alt fa-3x" style="color: var(--primary-color); margin-bottom: 15px;"></i>
+                        <h3>上传文档进行分析</h3>
+                        <p class="document-info">支持 .txt 和 .json 文件格式</p>
+                        <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
+                        <button class="btn btn-primary" style="margin-top: 15px;" id="uploadDocumentBtn">
+                            <i class="fas fa-upload"></i>
+                            选择文件
+                        </button>
+                        <div id="documentInfo" style="margin-top: 10px; font-size: 0.9rem;"></div>
+                    </div>
+                    
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="empty-state">
+                            <i class="fas fa-robot"></i>
+                            <h3>开始新的对话</h3>
+                            <p>选择左侧的对话或点击"新对话"按钮开始</p>
+                        </div>
+                    </div>
+                    
+                    <div class="cost-estimate" id="costEstimate" style="display: none;">
+                        <div class="cost-estimate-item">
+                            <span class="cost-label">上下文长度:</span>
+                            <span class="cost-value" id="currentContextLengthDisplay">7</span>
+                        </div>
+                        <div class="cost-estimate-item">
+                            <span class="cost-label">上下文消耗:</span>
+                            <span class="cost-value" id="totalCostEstimate">0.000</span>
+                            <span>电池</span>
+                        </div>
+                    </div>
+                    
+                    <div class="input-container">
+                        <div class="input-area">
+                            <textarea class="message-input" id="messageInput" placeholder="输入消息..."></textarea>
+                            <button class="send-button" id="sendButton">
+                                <i class="fas fa-paper-plane"></i>
+                                <span>发送</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="rechargeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">电池充值</h3>
+                <button class="modal-close" id="closeRechargeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">充值码</label>
+                    <input type="text" class="form-control recharge-code-input" id="rechargeCode" placeholder="请输入充值码">
+                </div>
+                
+                <button class="btn btn-primary" id="useRechargeCodeBtn" style="width: 100%; margin-top: 15px;">
+                    <i class="fas fa-bolt"></i>
+                    使用充值码
+                </button>
+                
+                <div class="current-time" style="margin-top: 15px; text-align: center;" id="rechargeCurrentTime"></div>
+                
+                <div class="recharge-info" id="rechargeInfo" style="display: none;">
+                    <div class="recharge-info-item">
+                        <span>用户邮箱:</span>
+                        <span id="rechargeEmail"></span>
+                    </div>
+                    <div class="recharge-info-item">
+                        <span>用户账号:</span>
+                        <span id="rechargeUsername"></span>
+                    </div>
+                    <div class="recharge-info-item">
+                        <span>充值电池量:</span>
+                        <span id="rechargeBattery" style="color: var(--secondary-color); font-weight: 700;"></span>
+                    </div>
+                    <div class="recharge-info-item">
+                        <span>生成时间:</span>
+                        <span id="rechargeTime"></span>
+                    </div>
+                    <div class="recharge-info-item">
+                        <span>防伪码:</span>
+                        <span id="rechargeSecurityCode" style="font-family: 'Courier New', monospace;"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="presetModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">人物预设管理</h3>
+                <button class="modal-close" id="closePresetModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="preset-switch">
+                    <div class="switch-container">
+                        <span>启用人物预设</span>
+                        <label class="switch">
+                            <input type="checkbox" id="presetToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">切换预设指令</label>
+                    <select class="form-control" id="presetSelect">
+                        <option value="">选择预设指令</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">预设指令 <span id="presetTokensDisplay" style="color: var(--text-secondary); font-size: 0.9rem;">(tokens: 0)</span></label>
+                    <textarea class="form-control" id="presetInstruction" rows="6" placeholder="输入预设指令..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">自定义预设名称</label>
+                    <input type="text" class="form-control" id="customPresetName" placeholder="自定义预设1">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">人物昵称设定</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" class="form-control" id="aiNickname" placeholder="AI昵称">
+                        <input type="text" class="form-control" id="userNickname" placeholder="用户昵称">
+                    </div>
+                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">昵称需同时设置或同时留空</small>
+                </div>
+                
+                <div class="preset-buttons">
+                    <button class="btn btn-primary" id="newPresetBtn">
+                        <i class="fas fa-plus"></i>
+                        新建预设指令
+                    </button>
+                    <button class="btn btn-success" id="savePresetBtn">
+                        <i class="fas fa-save"></i>
+                        保存并应用
+                    </button>
+                </div>
+                
+                <button class="btn btn-danger" id="deletePresetBtn" style="width: 100%;">
+                    <i class="fas fa-trash"></i>
+                    删除当前预设
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="renameModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">重命名对话</h3>
+                <button class="modal-close" id="closeRenameModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">对话名称</label>
+                    <input type="text" class="form-control" id="conversationName" placeholder="输入对话名称">
+                </div>
+                <button class="btn btn-primary" id="saveRenameBtn" style="width: 100%;">
+                    <i class="fas fa-save"></i>
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal warning-modal" id="deleteApiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title warning-header">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    警告
+                </h3>
+            </div>
+            <div class="warning-body">
+                <div class="warning-icon">
+                    <i class="fas fa-radiation-alt"></i>
+                </div>
+                <div class="warning-text">
+                    您即将删除API密钥，此操作不可逆！<br>
+                    删除后将无法使用AI功能，请谨慎操作！
+                </div>
+                <div class="warning-timer" id="deleteTimer">10</div>
+                <div class="warning-actions">
+                    <button class="btn btn-secondary" id="cancelDeleteApiBtn">取消</button>
+                    <button class="btn btn-danger" id="confirmDeleteApiBtn" disabled>
+                        <i class="fas fa-trash-alt"></i>
+                        确认删除 (<span id="deleteCountdown">10</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="apiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">API 管理</h3>
+                <button class="modal-close" id="closeApiModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4 style="margin-bottom: 15px;">添加新API</h4>
+                <div class="form-group">
+                    <label class="form-label">API名称</label>
+                    <input type="text" class="form-control" id="apiName" placeholder="如: DeepSeek API">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">API密钥</label>
+                    <input type="password" class="form-control" id="apiKey" placeholder="输入API密钥">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">端点URL</label>
+                    <input type="text" class="form-control" id="apiEndpoint" placeholder="https://api.deepseek.com/v1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">模型</label>
+                    <input type="text" class="form-control" id="apiModel" placeholder="deepseek-chat">
+                </div>
+                <button class="btn btn-primary" id="addApiBtn" style="width: 100%; margin-bottom: 25px;">
+                    <i class="fas fa-plus"></i>
+                    添加API
+                </button>
+                
+                <h4 style="margin-bottom: 15px;">已保存的 API</h4>
+                <div class="api-list" id="apiList">
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px; color: var(--text-secondary); font-size: 0.9rem;">
+                    <i class="fas fa-info-circle"></i> 此页面仅供高级用户使用
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification" id="notification">
+        <i class="fas fa-info-circle"></i>
+        <span id="notificationMessage">通知内容</span>
+    </div>
+    
+    <script>
+        const TOKEN_COST_CONFIG = {
+            COST_PER_TOKEN: 0.001,
+            WEIGHTS: {
+                CHINESE_CHAR: 0.65,
+                ENGLISH_CHAR: 0.35,
+                DIGIT: 0.25,
+                COMMON_PUNCTUATION: 1.0,
+                WHITESPACE: 0.25,
+                OTHER: 1.0,
+                SYSTEM_MESSAGE_OVERHEAD: 0,
+                MESSAGE_FORMAT_OVERHEAD: 0
+            }
+        };
+        
+        let currentUser = null;
+        let currentMode = 'chat';
+        let conversations = {
+            chat: [],
+            document: []
+        };
+        let currentConversationId = null;
+        let apis = [];
+        let currentApiId = null;
+        
+        let customPresets = [];
+        
+        let battery = 0.000;
+        let isRechargeCodeUsed = false;
+        let apiToDelete = null;
+        let deleteTimer = null;
+        let deleteCountdown = 10;
+        let temperature = 0.7;
+        let contextLength = 5;
+        let currentConversationCost = 0;
+        let todayCost = 0;
+        let totalCost = 0;
+        
+        const ENCRYPTION_KEY = 'sakura-ai-encryption-key-2024';
+        
+        const loginContainer = document.getElementById('loginContainer');
+        const appContainer = document.getElementById('appContainer');
+        const loginTabs = document.querySelectorAll('.login-tab');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginEmail = document.getElementById('loginEmail');
+        const loginUsername = document.getElementById('loginUsername');
+        const loginPassword = document.getElementById('loginPassword');
+        const registerEmail = document.getElementById('registerEmail');
+        const registerUsername = document.getElementById('registerUsername');
+        const registerPassword = document.getElementById('registerPassword');
+        const confirmPassword = document.getElementById('confirmPassword');
+        const sidebar = document.getElementById('sidebar');
+        const menuToggle = document.getElementById('menuToggle');
+        const userInfo = document.getElementById('userInfo');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const userEmail = document.getElementById('userEmail');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const batteryAmount = document.getElementById('batteryAmount');
+        const rechargeBtn = document.getElementById('rechargeBtn');
+        const currentTimeElement = document.getElementById('currentTime');
+        const recentConversationsTitle = document.getElementById('recentConversationsTitle');
+        const recentConversations = document.getElementById('recentConversations');
+        const modeItems = document.querySelectorAll('.mode-item[data-mode]');
+        const currentModeElement = document.getElementById('currentMode');
+        const conversationSidebar = document.getElementById('conversationSidebar');
+        const conversationList = document.getElementById('conversationList');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const newConversationSidebarBtn = document.getElementById('newConversationSidebarBtn');
+        const presetManagementBtn = document.getElementById('presetManagementBtn');
+        const rechargeModal = document.getElementById('rechargeModal');
+        const closeRechargeModal = document.getElementById('closeRechargeModal');
+        const rechargeCode = document.getElementById('rechargeCode');
+        const useRechargeCodeBtn = document.getElementById('useRechargeCodeBtn');
+        const rechargeInfo = document.getElementById('rechargeInfo');
+        const rechargeEmail = document.getElementById('rechargeEmail');
+        const rechargeUsername = document.getElementById('rechargeUsername');
+        const rechargeBattery = document.getElementById('rechargeBattery');
+        const rechargeTime = document.getElementById('rechargeTime');
+        const rechargeSecurityCode = document.getElementById('rechargeSecurityCode');
+        const rechargeCurrentTime = document.getElementById('rechargeCurrentTime');
+        const presetModal = document.getElementById('presetModal');
+        const renameModal = document.getElementById('renameModal');
+        const closePresetModal = document.getElementById('closePresetModal');
+        const closeRenameModal = document.getElementById('closeRenameModal');
+        const presetSelect = document.getElementById('presetSelect');
+        const presetInstruction = document.getElementById('presetInstruction');
+        const savePresetBtn = document.getElementById('savePresetBtn');
+        const conversationNameInput = document.getElementById('conversationName');
+        const saveRenameBtn = document.getElementById('saveRenameBtn');
+        const documentUpload = document.getElementById('documentUpload');
+        const uploadDocumentBtn = document.getElementById('uploadDocumentBtn');
+        const fileInput = document.getElementById('fileInput');
+        const documentInfo = document.getElementById('documentInfo');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const temperatureSlider = document.getElementById('temperatureSlider');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const contextSlider = document.getElementById('contextSlider');
+        const contextValue = document.getElementById('contextValue');
+        const currentConversationCostElement = document.getElementById('currentConversationCost');
+        const todayCostElement = document.getElementById('todayCost');
+        const totalCostElement = document.getElementById('totalCost');
+        const exportConversationBtn = document.getElementById('exportConversationBtn');
+        const apiModal = document.getElementById('apiModal');
+        const closeApiModal = document.getElementById('closeApiModal');
+        const apiList = document.getElementById('apiList');
+        const apiName = document.getElementById('apiName');
+        const apiKey = document.getElementById('apiKey');
+        const apiEndpoint = document.getElementById('apiEndpoint');
+        const apiModel = document.getElementById('apiModel');
+        const addApiBtn = document.getElementById('addApiBtn');
+        const deleteApiModal = document.getElementById('deleteApiModal');
+        const cancelDeleteApiBtn = document.getElementById('cancelDeleteApiBtn');
+        const confirmDeleteApiBtn = document.getElementById('confirmDeleteApiBtn');
+        const deleteTimerElement = document.getElementById('deleteTimer');
+        const deleteCountdownElement = document.getElementById('deleteCountdown');
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notificationMessage');
+        const costEstimate = document.getElementById('costEstimate');
+        const currentContextLengthDisplay = document.getElementById('currentContextLengthDisplay');
+        const totalCostEstimate = document.getElementById('totalCostEstimate');
+        const contextCostEstimate = document.getElementById('contextCostEstimate');
+        const contextTokensEstimate = document.getElementById('contextTokensEstimate');
+        const presetTokensDisplay = document.getElementById('presetTokensDisplay');
+        const presetToggle = document.getElementById('presetToggle');
+        const presetStatusDisplay = document.getElementById('presetStatusDisplay');
+        const customPresetName = document.getElementById('customPresetName');
+        const aiNickname = document.getElementById('aiNickname');
+        const userNickname = document.getElementById('userNickname');
+        const newPresetBtn = document.getElementById('newPresetBtn');
+        const deletePresetBtn = document.getElementById('deletePresetBtn');
+        
+        function estimateTextTokens(text) {
+            if (!text || typeof text !== 'string') return 0;
+            
+            let totalTokens = 0;
+            
+            for (let i = 0; i < text.length; i++) {
+                const charCode = text.charCodeAt(i);
+                const char = text.charAt(i);
+                
+                if (charCode >= 0x4E00 && charCode <= 0x9FFF) {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.CHINESE_CHAR;
+                } else if (/[a-zA-Z]/.test(char)) {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.ENGLISH_CHAR;
+                } else if (/[0-9]/.test(char)) {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.DIGIT;
+                } else if (/[,.;:'"!?，。；："！？、]/.test(char)) {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.COMMON_PUNCTUATION;
+                } else if (/\s/.test(char)) {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.WHITESPACE;
+                } else {
+                    totalTokens += TOKEN_COST_CONFIG.WEIGHTS.OTHER;
+                }
+            }
+            
+            return Math.max(1, totalTokens);
+        }
+        
+        function calculateMessageTokens(message, isSystemMessage = false) {
+            let tokens = estimateTextTokens(message);
+            
+            tokens += TOKEN_COST_CONFIG.WEIGHTS.MESSAGE_FORMAT_OVERHEAD;
+            
+            if (isSystemMessage) {
+                tokens += TOKEN_COST_CONFIG.WEIGHTS.SYSTEM_MESSAGE_OVERHEAD;
+            }
+            
+            return tokens;
+        }
+        
+        function calculateRequestTokens(conversation, newUserMessage = null) {
+            let totalTokens = 0;
+            
+            if (conversation.presetEnabled && conversation.presetContent) {
+                totalTokens += calculateMessageTokens(conversation.presetContent, true);
+            }
+            
+            if (conversation.aiNickname && conversation.userNickname) {
+                const nicknameMessage = `[你的名字:${conversation.aiNickname}][你对用户的称呼:${conversation.userNickname}]`;
+                totalTokens += calculateMessageTokens(nicknameMessage, true);
+            }
+            
+            if (currentMode === 'document' && conversation.document) {
+                const docMessage = `用户上传了一个文档，内容如下:\n\n${conversation.document.content}\n\n请根据文档内容回答用户的问题。`;
+                totalTokens += calculateMessageTokens(docMessage, true);
+            }
+            
+            const messages = [...conversation.messages];
+            
+            if (newUserMessage) {
+                const tempMessage = {
+                    role: 'user',
+                    content: newUserMessage,
+                    timestamp: new Date().toISOString()
+                };
+                messages.push(tempMessage);
+            }
+            
+            const contextLength = conversation.contextLength || 5;
+            const startIndex = Math.max(0, messages.length - contextLength * 2);
+            
+            for (let i = startIndex; i < messages.length; i++) {
+                const msg = messages[i];
+                const isSystemMsg = msg.role === 'system';
+                totalTokens += calculateMessageTokens(msg.content, isSystemMsg);
+            }
+            
+            return Math.ceil(totalTokens);
+        }
+        
+        function calculateBatteryCostByTokens(conversation, userMessage = null, aiResponse = null) {
+            const requestTokens = calculateRequestTokens(conversation, userMessage);
+            
+            const responseTokens = aiResponse ? estimateTextTokens(aiResponse) : 0;
+            
+            const totalTokens = requestTokens + responseTokens;
+            
+            const cost = totalTokens * TOKEN_COST_CONFIG.COST_PER_TOKEN;
+            
+            return {
+                totalTokens: totalTokens,
+                requestTokens: requestTokens,
+                responseTokens: responseTokens,
+                cost: parseFloat(cost.toFixed(6))
+            };
+        }
+        
+        function calculateBatteryCostByTokensForText(text) {
+            const tokens = estimateTextTokens(text);
+            const cost = tokens * TOKEN_COST_CONFIG.COST_PER_TOKEN;
+            return parseFloat(cost.toFixed(6));
+        }
+        
+        function calculateContextCost(conversation, userMessage = null) {
+            const requestTokens = calculateRequestTokens(conversation, userMessage);
+            const cost = requestTokens * TOKEN_COST_CONFIG.COST_PER_TOKEN;
+            
+            return {
+                tokens: requestTokens,
+                cost: parseFloat(cost.toFixed(6))
+            };
+        }
+        
+        function updateCostEstimate() {
+            const conversation = getCurrentConversation();
+            if (!conversation) {
+                costEstimate.style.display = 'none';
+                return;
+            }
+            
+            const userMessage = messageInput.value.trim();
+            const contextCost = calculateContextCost(conversation, userMessage);
+            
+            currentContextLengthDisplay.textContent = conversation.contextLength || contextLength;
+            totalCostEstimate.textContent = contextCost.cost.toFixed(3);
+            
+            costEstimate.style.display = 'flex';
+            
+            updateContextCostInfo();
+        }
+        
+        function updateContextCostInfo() {
+            const conversation = getCurrentConversation();
+            if (!conversation) return;
+            
+            const contextCost = calculateContextCost(conversation);
+            contextCostEstimate.textContent = contextCost.cost.toFixed(3);
+            contextTokensEstimate.textContent = contextCost.tokens;
+        }
+        
+        function updatePresetTokensDisplay() {
+            const tokens = estimateTextTokens(presetInstruction.value);
+            presetTokensDisplay.textContent = `(tokens: ${tokens})`;
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            checkLoginStatus();
+            setupEventListeners();
+            
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+            
+            setTimeout(() => {
+                if (!recentConversations.classList.contains('collapsed')) {
+                    toggleRecentConversations();
+                }
+            }, 100);
+            
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+        });
+        
+        function updateCurrentTime() {
+            const now = new Date();
+            const formattedTime = formatDateTime(now);
+            currentTimeElement.textContent = formattedTime;
+            
+            if (rechargeModal.classList.contains('active')) {
+                rechargeCurrentTime.textContent = formattedTime;
+            }
+        }
+        
+        function checkLoginStatus() {
+            const savedUser = localStorage.getItem('sakuraAI_currentUser');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    
+                    loadUserData();
+                    
+                    loginContainer.style.display = 'none';
+                    appContainer.style.display = 'flex';
+                    
+                    updateUserUI();
+                    
+                    if (apis.length === 0) {
+                        showNotification('您还没有设置API密钥，部分功能可能无法使用', 'warning');
+                    }
+                    
+                    if (conversations[currentMode].length === 0) {
+                        createNewConversation();
+                    } else {
+                        switchConversation(conversations[currentMode][0].id);
+                    }
+                    
+                    updateBatterySummary();
+                    updatePresetStatusDisplay();
+                } catch (error) {
+                    console.error('加载用户数据失败:', error);
+                    localStorage.removeItem('sakuraAI_currentUser');
+                }
+            }
+        }
+        
+        function setupEventListeners() {
+            loginTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.dataset.tab;
+                    
+                    loginTabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    loginForm.classList.remove('active');
+                    registerForm.classList.remove('active');
+                    
+                    if (tabName === 'login') {
+                        loginForm.classList.add('active');
+                    } else {
+                        registerForm.classList.add('active');
+                    }
+                });
+            });
+            
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                loginUser();
+            });
+            
+            registerForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                registerUser();
+            });
+            
+            menuToggle.addEventListener('click', toggleMenu);
+            
+            recentConversationsTitle.addEventListener('click', toggleRecentConversations);
+            
+            modeItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const mode = this.dataset.mode;
+                    switchMode(mode);
+                    
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('active');
+                    }
+                });
+            });
+            
+            logoutBtn.addEventListener('click', logoutUser);
+            
+            rechargeBtn.addEventListener('click', () => {
+                rechargeModal.classList.add('active');
+                updateCurrentTime();
+            });
+            
+            closeRechargeModal.addEventListener('click', () => {
+                rechargeModal.classList.remove('active');
+                rechargeInfo.style.display = 'none';
+                rechargeCode.value = '';
+            });
+            
+            useRechargeCodeBtn.addEventListener('click', useRechargeCode);
+            rechargeCode.addEventListener('input', function() {
+                if (rechargeInfo.style.display !== 'none') {
+                    rechargeInfo.style.display = 'none';
+                }
+            });
+            
+            presetManagementBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openPresetModal();
+                
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('active');
+                }
+            });
+            
+            newConversationSidebarBtn.addEventListener('click', createNewConversation);
+            
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+            
+            messageInput.addEventListener('input', function() {
+                updateCostEstimate();
+            });
+            
+            closePresetModal.addEventListener('click', () => presetModal.classList.remove('active'));
+            closeRenameModal.addEventListener('click', () => renameModal.classList.remove('active'));
+            closeApiModal.addEventListener('click', () => apiModal.classList.remove('active'));
+            
+            [rechargeModal, presetModal, renameModal, apiModal, deleteApiModal].forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.classList.remove('active');
+                        if (this === deleteApiModal) {
+                            clearDeleteTimer();
+                        }
+                        if (this === rechargeModal) {
+                            rechargeInfo.style.display = 'none';
+                            rechargeCode.value = '';
+                        }
+                    }
+                });
+            });
+            
+            presetInstruction.addEventListener('input', updatePresetTokensDisplay);
+            
+            presetToggle.addEventListener('change', function() {
+                const conversation = getCurrentConversation();
+                if (conversation) {
+                    conversation.presetEnabled = this.checked;
+                    saveUserData();
+                    updatePresetStatusDisplay();
+                    updateCostEstimate();
+                    updateContextCostInfo();
+                }
+            });
+            
+            savePresetBtn.addEventListener('click', savePreset);
+            newPresetBtn.addEventListener('click', createNewPreset);
+            deletePresetBtn.addEventListener('click', deleteCurrentPreset);
+            
+            saveRenameBtn.addEventListener('click', saveConversationRename);
+            
+            uploadDocumentBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileUpload);
+            
+            settingsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                settingsPanel.classList.toggle('active');
+            });
+            
+            closeSettingsBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                settingsPanel.classList.remove('active');
+            });
+            
+            temperatureSlider.addEventListener('input', function() {
+                temperatureValue.textContent = this.value;
+                temperature = parseFloat(this.value);
+                
+                if (currentConversationId) {
+                    const conversation = getCurrentConversation();
+                    if (conversation) {
+                        conversation.temperature = temperature;
+                        saveUserData();
+                    }
+                }
+            });
+            
+            contextSlider.addEventListener('input', function() {
+                contextValue.textContent = this.value;
+                contextLength = parseInt(this.value);
+                
+                if (currentConversationId) {
+                    const conversation = getCurrentConversation();
+                    if (conversation) {
+                        conversation.contextLength = contextLength;
+                        saveUserData();
+                        
+                        updateCostEstimate();
+                        updateContextCostInfo();
+                    }
+                }
+            });
+            
+            exportConversationBtn.addEventListener('click', exportConversation);
+            
+            addApiBtn.addEventListener('click', addNewApi);
+            
+            cancelDeleteApiBtn.addEventListener('click', function() {
+                deleteApiModal.classList.remove('active');
+                clearDeleteTimer();
+            });
+            
+            confirmDeleteApiBtn.addEventListener('click', deleteApi);
+            
+            document.addEventListener('click', function(e) {
+                if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+                    settingsPanel.classList.remove('active');
+                }
+            });
+            
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.add('active');
+                    conversationSidebar.classList.add('active');
+                }
+            });
+            
+            presetSelect.addEventListener('change', function() {
+                loadSelectedPreset();
+            });
+            
+            aiNickname.addEventListener('input', function() {
+                handleNicknameChange();
+            });
+            
+            userNickname.addEventListener('input', function() {
+                handleNicknameChange();
+            });
+        }
+        
+        function handleKeyboardShortcuts(e) {
+            if (e.shiftKey && e.altKey && e.key === 'S') {
+                e.preventDefault();
+                if (apiModal.classList.contains('active')) {
+                    apiModal.classList.remove('active');
+                } else {
+                    apiModal.classList.add('active');
+                    renderApiList();
+                }
+            }
+        }
+        
+        function toggleMenu() {
+            sidebar.classList.toggle('active');
+        }
+        
+        function toggleRecentConversations() {
+            const isCollapsed = recentConversations.classList.contains('collapsed');
+            const icon = recentConversationsTitle.querySelector('i');
+            
+            if (isCollapsed) {
+                recentConversations.classList.remove('collapsed');
+                recentConversationsTitle.classList.remove('collapsed');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                recentConversations.classList.add('collapsed');
+                recentConversationsTitle.classList.add('collapsed');
+                icon.style.transform = 'rotate(-90deg)';
+            }
+        }
+        
+        function loginUser() {
+            const email = loginEmail.value.trim();
+            const username = loginUsername.value.trim();
+            const password = loginPassword.value.trim();
+            
+            if (!email || !username || !password) {
+                showNotification('请输入完整的登录信息', 'error');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('sakuraAI_users') || '[]');
+            
+            const user = users.find(u => 
+                u.email === email && 
+                u.username === username && 
+                u.password === password
+            );
+            
+            if (!user) {
+                showNotification('邮箱、账号或密码错误', 'error');
+                return;
+            }
+            
+            currentUser = {
+                email: user.email,
+                username: user.username,
+                battery: user.battery || 0.000,
+                totalCost: user.totalCost || 0,
+                todayCost: user.todayCost || 0,
+                apis: user.apis || [],
+                customPresets: user.customPresets || [],
+                conversations: user.conversations || {
+                    chat: [],
+                    document: []
+                },
+                batteryHash: user.batteryHash || ''
+            };
+            
+            if (currentUser.batteryHash) {
+                const calculatedHash = simpleHash(currentUser.battery.toString() + ENCRYPTION_KEY);
+                if (calculatedHash !== currentUser.batteryHash) {
+                    showNotification('电池数据异常，已重置为0', 'warning');
+                    currentUser.battery = 0.000;
+                    currentUser.batteryHash = simpleHash('0.000' + ENCRYPTION_KEY);
+                }
+            }
+            
+            localStorage.setItem('sakuraAI_currentUser', JSON.stringify(currentUser));
+            
+            battery = currentUser.battery;
+            totalCost = currentUser.totalCost || 0;
+            todayCost = currentUser.todayCost || 0;
+            apis = currentUser.apis;
+            customPresets = currentUser.customPresets;
+            conversations = currentUser.conversations;
+            
+            if (apis.length > 0) {
+                currentApiId = apis[0].id;
+            }
+            
+            loginContainer.style.display = 'none';
+            appContainer.style.display = 'flex';
+            
+            updateUserUI();
+            
+            renderConversationList();
+            updateRecentConversations();
+            
+            if (conversations[currentMode].length > 0) {
+                switchConversation(conversations[currentMode][0].id);
+            } else {
+                createNewConversation();
+            }
+            
+            showNotification('登录成功', 'success');
+        }
+        
+        function registerUser() {
+            const email = registerEmail.value.trim();
+            const username = registerUsername.value.trim();
+            const password = registerPassword.value.trim();
+            const confirm = confirmPassword.value.trim();
+            
+            if (!email || !username || !password || !confirm) {
+                showNotification('请输入完整的注册信息', 'error');
+                return;
+            }
+            
+            if (password !== confirm) {
+                showNotification('两次输入的密码不一致', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showNotification('密码长度至少为6位', 'error');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('sakuraAI_users') || '[]');
+            
+            if (users.some(u => u.email === email)) {
+                showNotification('该邮箱已被注册', 'error');
+                return;
+            }
+            
+            if (users.some(u => u.username === username)) {
+                showNotification('该用户名已被使用', 'error');
+                return;
+            }
+            
+            const newUser = {
+                email: email,
+                username: username,
+                password: password,
+                battery: 0.000,
+                totalCost: 0,
+                todayCost: 0,
+                batteryHash: simpleHash('0.000' + ENCRYPTION_KEY),
+                apis: [],
+                customPresets: [],
+                conversations: {
+                    chat: [],
+                    document: []
+                },
+                createdAt: new Date().toISOString()
+            };
+            
+            users.push(newUser);
+            localStorage.setItem('sakuraAI_users', JSON.stringify(users));
+            
+            currentUser = { ...newUser };
+            delete currentUser.password;
+            
+            localStorage.setItem('sakuraAI_currentUser', JSON.stringify(currentUser));
+            
+            battery = currentUser.battery;
+            totalCost = currentUser.totalCost;
+            todayCost = currentUser.todayCost;
+            apis = currentUser.apis;
+            customPresets = currentUser.customPresets;
+            conversations = currentUser.conversations;
+            
+            loginContainer.style.display = 'none';
+            appContainer.style.display = 'flex';
+            
+            updateUserUI();
+            
+            createNewConversation();
+            
+            showNotification('注册成功', 'success');
+        }
+        
+        function logoutUser() {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('sakuraAI_currentUser');
+                currentUser = null;
+                
+                appContainer.style.display = 'none';
+                loginContainer.style.display = 'flex';
+                
+                loginEmail.value = '';
+                loginUsername.value = '';
+                loginPassword.value = '';
+                
+                showNotification('已退出登录', 'success');
+            }
+        }
+        
+        function updateUserUI() {
+            if (!currentUser) return;
+            
+            userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
+            userName.textContent = currentUser.username;
+            userEmail.textContent = currentUser.email;
+            
+            updateBatteryUI();
+        }
+        
+        function updateBatteryUI() {
+            batteryAmount.textContent = battery.toFixed(3);
+            
+            if (battery < 1) {
+                batteryAmount.classList.add('battery-low');
+            } else {
+                batteryAmount.classList.remove('battery-low');
+            }
+            
+            sendButton.disabled = battery <= 0;
+            messageInput.placeholder = battery <= 0 ? '电池不足，请充值后使用' : '输入消息...';
+        }
+          
+        function consumeBattery(cost) {
+            battery -= cost;
+            
+            if (battery < 0) battery = 0;
+            
+            totalCost += cost;
+            todayCost += cost;
+            
+            if (currentUser) {
+                currentUser.battery = battery;
+                currentUser.totalCost = totalCost;
+                currentUser.todayCost = todayCost;
+                currentUser.batteryHash = simpleHash(battery.toString() + ENCRYPTION_KEY);
+                saveUserData();
+            }
+            
+            updateBatteryUI();
+            
+            updateBatterySummary();
+            
+            return battery;
+        }
+        
+        function rechargeBatteryFunc(amount) {
+            battery += amount;
+            
+            if (currentUser) {
+                currentUser.battery = battery;
+                currentUser.batteryHash = simpleHash(battery.toString() + ENCRYPTION_KEY);
+                saveUserData();
+            }
+            
+            updateBatteryUI();
+            
+            return battery;
+        }
+        
+        function useRechargeCode() {
+            const code = rechargeCode.value.trim();
+            
+            if (!code) {
+                showNotification('请输入充值码', 'error');
+                return;
+            }
+            
+            try {
+                const decoded = atob(code);
+                const data = JSON.parse(decoded);
+                
+                if (!data.email || !data.username || !data.battery || !data.securityCode || !data.timestamp) {
+                    showNotification('充值码格式错误', 'error');
+                    return;
+                }
+                
+                if (data.email !== currentUser.email || data.username !== currentUser.username) {
+                    showNotification('此充值码不属于当前用户', 'error');
+                    return;
+                }
+                
+                const securityCodeRegex = /^[0-9A-Za-z]{6}$/;
+                if (!securityCodeRegex.test(data.securityCode)) {
+                    showNotification('充值码防伪码格式错误', 'error');
+                    return;
+                }
+                
+                const usedCodes = JSON.parse(localStorage.getItem('sakuraAI_usedRechargeCodes') || '[]');
+                if (usedCodes.includes(code)) {
+                    showNotification('此充值码已被使用', 'error');
+                    return;
+                }
+                
+                const now = new Date().getTime();
+                const codeTime = new Date(data.timestamp).getTime();
+                const tenMinutes = 10 * 60 * 1000;
+                
+                if (now - codeTime > tenMinutes) {
+                    showNotification('充值码已过期', 'error');
+                    return;
+                }
+                
+                if (data.apiKey) {
+                    if (apis.length === 0) {
+                        const apiId = Date.now();
+                        apis.push({
+                            id: apiId,
+                            name: '充值码API',
+                            key: data.apiKey,
+                            endpoint: 'https://api.deepseek.com/v1',
+                            model: 'deepseek-chat',
+                            isActive: true
+                        });
+                        currentApiId = apiId;
+                        currentUser.apis = apis;
+                        
+                        showNotification('API密钥已自动添加', 'success');
+                    } else {
+                        const existingApi = apis.find(api => api.key === data.apiKey);
+                        if (!existingApi) {
+                            showNotification('充值码中的密钥与用户不匹配', 'error');
+                            return;
+                        }
+                    }
+                }
+                
+                rechargeEmail.textContent = data.email;
+                rechargeUsername.textContent = data.username;
+                rechargeBattery.textContent = data.battery.toFixed(3);
+                rechargeTime.textContent = formatDateTime(new Date(data.timestamp));
+                rechargeSecurityCode.textContent = data.securityCode;
+                rechargeInfo.style.display = 'block';
+                
+                if (confirm(`确定要充值 ${data.battery.toFixed(3)} 电池吗？`)) {
+                    usedCodes.push(code);
+                    localStorage.setItem('sakuraAI_usedRechargeCodes', JSON.stringify(usedCodes));
+                    
+                    rechargeBatteryFunc(data.battery);
+                    
+                    saveUserData();
+                    
+                    rechargeModal.classList.remove('active');
+                    rechargeInfo.style.display = 'none';
+                    rechargeCode.value = '';
+                    
+                    showNotification(`成功充值 ${data.battery.toFixed(3)} 电池`, 'success');
+                }
+                
+            } catch (error) {
+                console.error('解析充值码失败:', error);
+                showNotification('充值码无效', 'error');
+            }
+        }
+        
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString(16);
+        }
+        
+        function loadUserData() {
+            if (!currentUser) return;
+            
+            battery = currentUser.battery || 0.000;
+            totalCost = currentUser.totalCost || 0;
+            todayCost = currentUser.todayCost || 0;
+            apis = currentUser.apis || [];
+            customPresets = currentUser.customPresets || [];
+            conversations = currentUser.conversations || {
+                chat: [],
+                document: []
+            };
+            
+            if (apis.length > 0) {
+                currentApiId = apis[0].id;
+            }
+        }
+        
+        function saveUserData() {
+            if (!currentUser) return;
+            
+            currentUser.battery = battery;
+            currentUser.totalCost = totalCost;
+            currentUser.todayCost = todayCost;
+            currentUser.batteryHash = simpleHash(battery.toString() + ENCRYPTION_KEY);
+            currentUser.apis = apis;
+            currentUser.customPresets = customPresets;
+            currentUser.conversations = conversations;
+            
+            localStorage.setItem('sakuraAI_currentUser', JSON.stringify(currentUser));
+            
+            const users = JSON.parse(localStorage.getItem('sakuraAI_users') || '[]');
+            const userIndex = users.findIndex(u => u.email === currentUser.email && u.username === currentUser.username);
+            
+            if (userIndex !== -1) {
+                const updatedUser = {
+                    ...users[userIndex],
+                    battery: currentUser.battery,
+                    totalCost: currentUser.totalCost,
+                    todayCost: currentUser.todayCost,
+                    batteryHash: currentUser.batteryHash,
+                    apis: currentUser.apis,
+                    customPresets: currentUser.customPresets,
+                    conversations: currentUser.conversations
+                };
+                
+                users[userIndex] = updatedUser;
+                localStorage.setItem('sakuraAI_users', JSON.stringify(users));
+            }
+        }
+        
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            const modeNames = {
+                chat: '文字对话',
+                document: '文档分析'
+            };
+            currentModeElement.textContent = modeNames[mode];
+            
+            modeItems.forEach(item => {
+                if (item.dataset.mode === mode) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            if (mode === 'document') {
+                documentUpload.style.display = 'block';
+            } else {
+                documentUpload.style.display = 'none';
+            }
+            
+            renderConversationList();
+            
+            if (conversations[mode].length === 0) {
+                createNewConversation();
+            } else {
+                switchConversation(conversations[mode][0].id);
+            }
+        }
+        
+        function createNewConversation() {
+            const conversationId = Date.now();
+            const conversation = {
+                id: conversationId,
+                mode: currentMode,
+                title: `新对话 ${conversations[currentMode].length + 1}`,
+                messages: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                temperature: temperature,
+                contextLength: contextLength,
+                isNew: true,
+                totalCost: 0,
+                presetEnabled: false,
+                presetContent: '',
+                presetIndex: -1,
+                aiNickname: '',
+                userNickname: ''
+            };
+            
+            conversations[currentMode].unshift(conversation);
+            currentConversationId = conversationId;
+            
+            saveUserData();
+            
+            renderConversationList();
+            renderMessages();
+            updateRecentConversations();
+            
+            messageInput.value = '';
+            messageInput.focus();
+            
+            currentConversationCost = 0;
+            updateBatterySummary();
+            updateCostEstimate();
+            updatePresetStatusDisplay();
+        }
+        
+        function switchConversation(conversationId) {
+            currentConversationId = conversationId;
+            
+            renderConversationList();
+            
+            renderMessages();
+            
+            const conversation = getCurrentConversation();
+            if (conversation) {
+                temperatureSlider.value = conversation.temperature || temperature;
+                temperatureValue.textContent = conversation.temperature || temperature;
+                temperature = conversation.temperature || temperature;
+                
+                contextSlider.value = conversation.contextLength || contextLength;
+                contextValue.textContent = conversation.contextLength || contextLength;
+                contextLength = conversation.contextLength || contextLength;
+                
+                currentConversationCost = conversation.totalCost || 0;
+                updateBatterySummary();
+                updateCostEstimate();
+                updatePresetStatusDisplay();
+                
+                if (currentMode === 'document' && conversation.document) {
+                    documentInfo.innerHTML = `
+                        <div style="background: rgba(124, 58, 237, 0.1); padding: 10px; border-radius: 6px;">
+                            <i class="fas fa-file"></i> 
+                            已上传: ${conversation.document.name} (${formatFileSize(conversation.document.size)})
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        function getCurrentConversation() {
+            if (!currentConversationId) return null;
+            
+            for (const mode in conversations) {
+                const conversation = conversations[mode].find(c => c.id === currentConversationId);
+                if (conversation) return conversation;
+            }
+            
+            return null;
+        }
+        
+        function renderConversationList() {
+            conversationList.innerHTML = '';
+            
+            if (conversations[currentMode].length === 0) {
+                conversationList.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fas fa-comments"></i>
+                        <p>没有对话记录</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            conversations[currentMode].forEach(conversation => {
+                const isActive = conversation.id === currentConversationId;
+                const item = document.createElement('div');
+                item.className = `conversation-item ${isActive ? 'active' : ''}`;
+                item.dataset.id = conversation.id;
+                
+                const formattedTime = formatDateTime(new Date(conversation.updatedAt));
+                
+                item.innerHTML = `
+                    <div style="flex: 1;">
+                        <div class="conversation-title">${conversation.title}</div>
+                        <div class="conversation-time">${formattedTime}</div>
+                    </div>
+                    <div class="conversation-actions">
+                        <button class="conversation-action-btn rename-btn" title="重命名">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="conversation-action-btn delete-btn" title="删除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                item.addEventListener('click', function(e) {
+                    if (!e.target.closest('.conversation-action-btn')) {
+                        switchConversation(conversation.id);
+                    }
+                });
+                
+                const renameBtn = item.querySelector('.rename-btn');
+                renameBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    openRenameModal(conversation.id, conversation.title);
+                });
+                
+                const deleteBtn = item.querySelector('.delete-btn');
+                deleteBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    deleteConversation(conversation.id);
+                });
+                
+                conversationList.appendChild(item);
+            });
+        }
+        
+        function renderMessages() {
+            const conversation = getCurrentConversation();
+            messagesContainer.innerHTML = '';
+            
+            if (!conversation || conversation.messages.length === 0) {
+                messagesContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-robot"></i>
+                        <h3>开始新的对话</h3>
+                        <p>在下方输入框发送消息开始对话</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            conversation.messages.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${message.role === 'user' ? 'user-message' : 'ai-message'}`;
+                
+                const wordCount = message.content.length;
+                
+                const formattedTime = formatDateTime(new Date(message.timestamp));
+                
+                const displayName = getDisplayName(message.role, conversation);
+                
+                const htmlContent = convertMarkdownToHtml(message.content);
+                
+                messageElement.innerHTML = `
+                    <div class="message-header">
+                        <span>${displayName}</span>
+                        <span>${formattedTime}</span>
+                    </div>
+                    <div class="message-content">${htmlContent}</div>
+                    <div class="message-footer">
+                        <span>字数: ${wordCount}</span>
+                        <span>消耗: ${message.batteryCost ? message.batteryCost.toFixed(3) : '0.000'} 电池</span>
+                    </div>
+                `;
+                
+                messagesContainer.appendChild(messageElement);
+            });
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function getDisplayName(role, conversation) {
+            if (role === 'user') {
+                return conversation.userNickname || '您';
+            } else {
+                return conversation.aiNickname || 'AI';
+            }
+        }
+        
+        function convertMarkdownToHtml(markdown) {
+            if (!markdown) return '';
+            
+            let html = markdown;
+            
+            html = html.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+            
+            html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+            
+            html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            html = html.replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>');
+            
+            html = html.replace(/^[-*] (.*$)/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+            
+            html = html.replace(/^\d+\. (.*$)/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/gs, '<ol>$1</ol>');
+            
+            html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+            
+            html = html.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%;">');
+            
+            html = html.replace(/^---$/gm, '<hr>');
+            
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = '<p>' + html + '</p>';
+            
+            return html;
+        }
+        
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content) return;
+            
+            if (apis.length === 0) {
+                showNotification('请先设置API密钥', 'error');
+                return;
+            }
+            
+            let conversation = getCurrentConversation();
+            if (!conversation) {
+                createNewConversation();
+                conversation = getCurrentConversation();
+            }
+            
+            messageInput.value = '';
+            
+            const userMessage = {
+                role: 'user',
+                content: content,
+                timestamp: new Date().toISOString(),
+                wordCount: content.length,
+                batteryCost: 0
+            };
+            
+            conversation.messages.push(userMessage);
+            conversation.isNew = false;
+            conversation.updatedAt = new Date().toISOString();
+            
+            renderMessages();
+            
+            const aiMessageElement = document.createElement('div');
+            aiMessageElement.className = 'message ai-message';
+            aiMessageElement.innerHTML = `
+                <div class="message-header">
+                    <span>${conversation.aiNickname || 'AI'}</span>
+                    <span>正在思考...</span>
+                </div>
+                <div class="loading">
+                    <div class="loading-dots">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(aiMessageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            try {
+                const costEstimate = calculateBatteryCostByTokens(conversation, content);
+                
+                if (battery - costEstimate.cost < 0) {
+                    aiMessageElement.remove();
+                    
+                    conversation.messages.pop();
+                    
+                    renderMessages();
+                    
+                    showNotification('电池不足，请充值后使用', 'error');
+                    return;
+                }
+                
+                const aiResponse = await getAIResponse(conversation);
+                
+                aiMessageElement.remove();
+                
+                const finalCost = calculateBatteryCostByTokens(conversation, content, aiResponse);
+                
+                userMessage.batteryCost = calculateBatteryCostByTokensForText(content);
+                
+                const aiMessage = {
+                    role: 'assistant',
+                    content: aiResponse,
+                    timestamp: new Date().toISOString(),
+                    wordCount: aiResponse.length,
+                    batteryCost: calculateBatteryCostByTokensForText(aiResponse)
+                };
+                
+                conversation.messages.push(aiMessage);
+                conversation.updatedAt = new Date().toISOString();
+                
+                currentConversationCost += finalCost.cost;
+                conversation.totalCost = currentConversationCost;
+                
+                consumeBattery(finalCost.cost);
+                
+                saveUserData();
+                
+                renderMessages();
+                updateRecentConversations();
+                
+                updateBatterySummary();
+                updateCostEstimate();
+                
+            } catch (error) {
+                console.error('获取AI响应失败:', error);
+                
+                aiMessageElement.remove();
+                
+                conversation.messages.pop();
+                
+                renderMessages();
+                
+                showNotification(`API调用失败: ${error.message}`, 'error');
+            }
+        }
+        
+        async function getAIResponse(conversation) {
+            if (apis.length === 0) {
+                throw new Error('请先设置API密钥');
+            }
+            
+            const api = apis.find(a => a.id === currentApiId) || apis[0];
+            if (!api) {
+                throw new Error('没有可用的API');
+            }
+            
+            const messages = [];
+            
+            if (conversation.presetEnabled && conversation.presetContent) {
+                messages.push({
+                    role: "system",
+                    content: conversation.presetContent
+                });
+            }
+            
+            if (conversation.aiNickname && conversation.userNickname) {
+                messages.push({
+                    role: "system",
+                    content: `[你的名字:${conversation.aiNickname}][你对用户的称呼:${conversation.userNickname}]`
+                });
+            }
+            
+            if (currentMode === 'document' && conversation.document) {
+                messages.unshift({
+                    role: 'system',
+                    content: `用户上传了一个文档，内容如下:\n\n${conversation.document.content}\n\n请根据文档内容回答用户的问题。`
+                });
+            }
+            
+            const contextLength = conversation.contextLength || 5;
+            const startIndex = Math.max(0, conversation.messages.length - contextLength * 2);
+            
+            for (let i = startIndex; i < conversation.messages.length; i++) {
+                const msg = conversation.messages[i];
+                messages.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.content
+                });
+            }
+            
+            const endpoint = api.endpoint || 'https://api.deepseek.com/v1';
+            const response = await fetch(`${endpoint}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${api.key}`
+                },
+                body: JSON.stringify({
+                    model: api.model || 'deepseek-chat',
+                    messages: messages,
+                    max_tokens: 4000,
+                    temperature: conversation.temperature || temperature
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || 'API请求失败');
+            }
+            
+            const data = await response.json();
+            return data.choices[0].message.content;
+        }
+        
+        function openPresetModal() {
+            presetModal.classList.add('active');
+            loadPresetSelect();
+            loadSelectedPreset();
+        }
+        
+        function loadPresetSelect() {
+            presetSelect.innerHTML = '<option value="">选择预设指令</option>';
+            
+            customPresets.forEach((preset, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = preset.name;
+                presetSelect.appendChild(option);
+            });
+            
+            const conversation = getCurrentConversation();
+            if (conversation && conversation.presetIndex !== -1) {
+                presetSelect.value = conversation.presetIndex;
+            }
+        }
+        
+        function loadSelectedPreset() {
+            const conversation = getCurrentConversation();
+            if (!conversation) return;
+            
+            const selectedIndex = presetSelect.value;
+            
+            if (selectedIndex === "") {
+                presetInstruction.value = conversation.presetContent || '';
+                customPresetName.value = '自定义预设1';
+                presetToggle.checked = conversation.presetEnabled || false;
+                aiNickname.value = conversation.aiNickname || '';
+                userNickname.value = conversation.userNickname || '';
+                updatePresetTokensDisplay();
+                return;
+            }
+            
+            const index = parseInt(selectedIndex);
+            if (index >= 0 && index < customPresets.length) {
+                const preset = customPresets[index];
+                presetInstruction.value = preset.content || '';
+                customPresetName.value = preset.name || `自定义预设${index + 1}`;
+                presetToggle.checked = conversation.presetEnabled || false;
+                aiNickname.value = conversation.aiNickname || '';
+                userNickname.value = conversation.userNickname || '';
+                updatePresetTokensDisplay();
+            }
+        }
+        
+        function updatePresetStatusDisplay() {
+            const conversation = getCurrentConversation();
+            if (!conversation) return;
+            
+            if (conversation.presetEnabled) {
+                presetStatusDisplay.textContent = '已启用';
+                presetStatusDisplay.className = 'nickname-status enabled';
+            } else {
+                presetStatusDisplay.textContent = '待机中';
+                presetStatusDisplay.className = 'nickname-status disabled';
+            }
+        }
+        
+        function createNewPreset() {
+            const defaultName = `自定义预设${customPresets.length + 1}`;
+            customPresetName.value = defaultName;
+            presetInstruction.value = '';
+            presetSelect.value = '';
+            updatePresetTokensDisplay();
+        }
+        
+        function savePreset() {
+            const name = customPresetName.value.trim();
+            const content = presetInstruction.value.trim();
+            
+            if (!name) {
+                showNotification('请输入预设名称', 'error');
+                return;
+            }
+            
+            const conversation = getCurrentConversation();
+            if (!conversation) return;
+            
+            const selectedIndex = presetSelect.value;
+            
+            if (selectedIndex === "") {
+                const newPreset = {
+                    name: name,
+                    content: content
+                };
+                customPresets.push(newPreset);
+                const newIndex = customPresets.length - 1;
+                
+                conversation.presetContent = content;
+                conversation.presetIndex = newIndex;
+                conversation.presetEnabled = presetToggle.checked;
+                
+                saveUserData();
+                loadPresetSelect();
+                presetSelect.value = newIndex;
+            } else {
+                const index = parseInt(selectedIndex);
+                customPresets[index].name = name;
+                customPresets[index].content = content;
+                
+                conversation.presetContent = content;
+                conversation.presetIndex = index;
+                conversation.presetEnabled = presetToggle.checked;
+                
+                saveUserData();
+                loadPresetSelect();
+                presetSelect.value = index;
+            }
+            
+            currentUser.customPresets = customPresets;
+            saveUserData();
+            
+            updatePresetStatusDisplay();
+            updateCostEstimate();
+            updateContextCostInfo();
+            showNotification('预设已保存', 'success');
+        }
+        
+        function deleteCurrentPreset() {
+            const selectedIndex = presetSelect.value;
+            
+            if (selectedIndex === "") {
+                showNotification('请先选择要删除的预设', 'error');
+                return;
+            }
+            
+            if (!confirm('确定要删除这个预设吗？')) return;
+            
+            const index = parseInt(selectedIndex);
+            customPresets.splice(index, 1);
+            
+            const conversation = getCurrentConversation();
+            if (conversation && conversation.presetIndex === index) {
+                conversation.presetContent = '';
+                conversation.presetEnabled = false;
+                conversation.presetIndex = -1;
+            }
+            
+            currentUser.customPresets = customPresets;
+            saveUserData();
+            
+            loadPresetSelect();
+            presetInstruction.value = '';
+            customPresetName.value = '自定义预设1';
+            presetToggle.checked = false;
+            
+            updatePresetStatusDisplay();
+            updateCostEstimate();
+            updateContextCostInfo();
+            showNotification('预设已删除', 'success');
+        }
+        
+        function handleNicknameChange() {
+            const conversation = getCurrentConversation();
+            if (!conversation) return;
+            
+            const ai = aiNickname.value.trim();
+            const user = userNickname.value.trim();
+            
+            if ((ai && !user) || (!ai && user)) {
+                showNotification('昵称需同时设置或同时留空', 'warning');
+                return;
+            }
+            
+            conversation.aiNickname = ai;
+            conversation.userNickname = user;
+            
+            saveUserData();
+            updateCostEstimate();
+            updateContextCostInfo();
+            
+            renderMessages();
+        }
+        
+        function openRenameModal(conversationId, currentName) {
+            renameModal.classList.add('active');
+            conversationNameInput.value = currentName;
+            conversationNameInput.dataset.id = conversationId;
+        }
+        
+        function saveConversationRename() {
+            const conversationId = parseInt(conversationNameInput.dataset.id);
+            const newName = conversationNameInput.value.trim();
+            
+            if (!newName) {
+                showNotification('对话名称不能为空', 'error');
+                return;
+            }
+            
+            for (const mode in conversations) {
+                const conversation = conversations[mode].find(c => c.id === conversationId);
+                if (conversation) {
+                    conversation.title = newName;
+                    conversation.updatedAt = new Date().toISOString();
+                    break;
+                }
+            }
+            
+            saveUserData();
+            renderConversationList();
+            updateRecentConversations();
+            renameModal.classList.remove('active');
+            showNotification('对话已重命名', 'success');
+        }
+        
+        function deleteConversation(conversationId) {
+            if (!confirm('确定要删除这个对话吗？')) return;
+            
+            for (const mode in conversations) {
+                conversations[mode] = conversations[mode].filter(c => c.id !== conversationId);
+            }
+            
+            if (conversationId === currentConversationId) {
+                if (conversations[currentMode].length > 0) {
+                    switchConversation(conversations[currentMode][0].id);
+                } else {
+                    createNewConversation();
+                }
+            }
+            
+            saveUserData();
+            renderConversationList();
+            updateRecentConversations();
+            showNotification('对话已删除', 'success');
+        }
+        
+        function addNewApi() {
+            const name = apiName.value.trim();
+            const key = apiKey.value.trim();
+            const endpoint = apiEndpoint.value.trim();
+            const model = apiModel.value.trim();
+            
+            if (!name || !key) {
+                showNotification('API名称和密钥不能为空', 'error');
+                return;
+            }
+            
+            const existingApi = apis.find(api => api.key === key);
+            if (existingApi) {
+                showNotification('该API密钥已存在', 'error');
+                return;
+            }
+            
+            const apiId = Date.now();
+            const newApi = {
+                id: apiId,
+                name: name,
+                key: key,
+                endpoint: endpoint || 'https://api.deepseek.com/v1',
+                model: model || 'deepseek-chat',
+                isActive: true
+            };
+            
+            apis.push(newApi);
+            
+            if (apis.length === 1) {
+                currentApiId = apiId;
+            }
+            
+            if (currentUser) {
+                currentUser.apis = apis;
+                saveUserData();
+            }
+            
+            apiName.value = '';
+            apiKey.value = '';
+            apiEndpoint.value = 'https://api.deepseek.com/v1';
+            apiModel.value = 'deepseek-chat';
+            
+            renderApiList();
+            
+            showNotification('API添加成功', 'success');
+        }
+        
+        function renderApiList() {
+            apiList.innerHTML = '';
+            
+            if (apis.length === 0) {
+                apiList.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">暂无API</div>';
+                return;
+            }
+            
+            apis.forEach(api => {
+                const item = document.createElement('div');
+                item.className = `api-item ${api.id === currentApiId ? 'active' : ''}`;
+                
+                const hiddenKey = api.key.substring(0, 8) + '***' + api.key.substring(api.key.length - 4);
+                
+                item.innerHTML = `
+                    <div style="flex: 1;">
+                        <div class="api-name">${api.name} ${api.id === currentApiId ? '<span style="color: var(--secondary-color); font-size: 0.8rem;">(当前使用)</span>' : ''}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 5px;">
+                            端点: ${api.endpoint}<br>
+                            模型: ${api.model}
+                        </div>
+                    </div>
+                    <div class="api-actions">
+                        <button class="btn btn-secondary btn-sm switch-api-btn" data-id="${api.id}" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 5px;">
+                            <i class="fas fa-toggle-on"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-api-btn" data-id="${api.id}" style="padding: 4px 8px; font-size: 0.8rem;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                apiList.appendChild(item);
+            });
+            
+            document.querySelectorAll('.switch-api-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const apiId = parseInt(this.dataset.id);
+                    switchApi(apiId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-api-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const apiId = parseInt(this.dataset.id);
+                    openDeleteApiModal(apiId);
+                });
+            });
+        }
+        
+        function switchApi(apiId) {
+            currentApiId = apiId;
+            
+            if (currentUser) {
+                saveUserData();
+            }
+            
+            renderApiList();
+            
+            showNotification('已切换API', 'success');
+        }
+        
+        function openDeleteApiModal(apiId) {
+            apiToDelete = apiId;
+            deleteCountdown = 10;
+            deleteTimerElement.textContent = deleteCountdown;
+            deleteCountdownElement.textContent = deleteCountdown;
+            
+            confirmDeleteApiBtn.disabled = true;
+            deleteApiModal.classList.add('active');
+            
+            deleteTimer = setInterval(() => {
+                deleteCountdown--;
+                deleteTimerElement.textContent = deleteCountdown;
+                deleteCountdownElement.textContent = deleteCountdown;
+                
+                if (deleteCountdown <= 0) {
+                    clearDeleteTimer();
+                    confirmDeleteApiBtn.disabled = false;
+                }
+            }, 1000);
+        }
+        
+        function clearDeleteTimer() {
+            if (deleteTimer) {
+                clearInterval(deleteTimer);
+                deleteTimer = null;
+            }
+        }
+        
+        function deleteApi() {
+            apis = apis.filter(api => api.id !== apiToDelete);
+            
+            if (apiToDelete === currentApiId) {
+                currentApiId = apis.length > 0 ? apis[0].id : null;
+            }
+            
+            currentUser.apis = apis;
+            saveUserData();
+            
+            deleteApiModal.classList.remove('active');
+            clearDeleteTimer();
+            
+            renderApiList();
+            
+            showNotification('API已删除', 'success');
+            
+            if (apis.length === 0) {
+                showNotification('您已删除所有API密钥，请添加新的API以使用AI功能', 'warning');
+            }
+        }
+        
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const fileType = file.type;
+            const validTypes = ['text/plain', 'application/json'];
+            const validExtensions = ['.txt', '.json'];
+            
+            const fileName = file.name.toLowerCase();
+            const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+            
+            if (!validTypes.includes(fileType) && !isValidExtension) {
+                showNotification('只支持 .txt 和 .json 文件', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const content = event.target.result;
+                
+                const conversation = getCurrentConversation();
+                if (conversation) {
+                    conversation.document = {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        content: content
+                    };
+                    
+                    documentInfo.innerHTML = `
+                        <div style="background: rgba(124, 58, 237, 0.1); padding: 10px; border-radius: 6px;">
+                            <i class="fas fa-file"></i> 
+                            已上传: ${file.name} (${formatFileSize(file.size)})
+                        </div>
+                    `;
+                    
+                    saveUserData();
+                    updateCostEstimate();
+                    updateContextCostInfo();
+                    showNotification('文档已上传', 'success');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        function updateBatterySummary() {
+            currentConversationCostElement.textContent = currentConversationCost.toFixed(3);
+            todayCostElement.textContent = todayCost.toFixed(3);
+            totalCostElement.textContent = totalCost.toFixed(3);
+        }
+        
+        function exportConversation() {
+            const conversation = getCurrentConversation();
+            if (!conversation || conversation.messages.length === 0) {
+                showNotification('当前对话没有内容可以导出', 'error');
+                return;
+            }
+            
+            let exportContent = '';
+            
+            conversation.messages.forEach(message => {
+                exportContent += `${message.role === 'user' ? '用户' : 'AI'}: ${message.content}\n\n`;
+            });
+            
+            const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${conversation.title || '对话记录'}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('对话已导出', 'success');
+        }
+        
+        function updateRecentConversations() {
+            recentConversations.innerHTML = '';
+            
+            let allConversations = [];
+            for (const mode in conversations) {
+                allConversations = allConversations.concat(conversations[mode]);
+            }
+            
+            allConversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            
+            const recent = allConversations.slice(0, 5);
+            
+            if (recent.length === 0) {
+                recentConversations.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; padding: 10px;">暂无对话</div>';
+                return;
+            }
+            
+            recent.forEach(conversation => {
+                const modeNames = {
+                    chat: '文字对话',
+                    document: '文档'
+                };
+                
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'mode-item';
+                
+                item.innerHTML = `
+                    <div class="mode-icon">
+                        <i class="fas fa-${getModeIcon(conversation.mode)}"></i>
+                    </div>
+                    <div class="mode-name">
+                        <div style="font-size: 0.9rem;">${conversation.title}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${modeNames[conversation.mode]}</div>
+                    </div>
+                `;
+                
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    switchMode(conversation.mode);
+                    switchConversation(conversation.id);
+                });
+                
+                recentConversations.appendChild(item);
+            });
+        }
+        
+        function getModeIcon(mode) {
+            const icons = {
+                chat: 'comment-dots',
+                document: 'file-alt'
+            };
+            return icons[mode] || 'comment-dots';
+        }
+        
+        function showNotification(message, type = 'info') {
+            notificationMessage.textContent = message;
+            notification.className = 'notification';
+            
+            if (type === 'error') {
+                notification.classList.add('error');
+            } else if (type === 'success') {
+                notification.classList.add('success');
+            } else if (type === 'warning') {
+                notification.classList.add('warning');
+            }
+            
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${year}/${month}/${day} ${hours}:${minutes}`;
+        }
+        
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return formatDateTime(date);
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
