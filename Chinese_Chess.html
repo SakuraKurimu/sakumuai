@@ -26,7 +26,7 @@
             border-radius: 24px;
             padding: 24px;
             box-shadow: 0 20px 30px rgba(0,0,0,0.6);
-            max-width: 1200px;
+            max-width: 1400px;
             width: fit-content;
             gap: 24px;
         }
@@ -39,6 +39,38 @@
             display: flex;
             flex-direction: column;
             height: 600px;
+        }
+        
+        .debug-panel {
+            width: 220px;
+            background: #f0e2c5;
+            border-radius: 20px;
+            padding: 16px 10px;
+            box-shadow: inset 0 0 0 2px #baa07a, 0 8px 12px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+        
+        .debug-panel h3 {
+            text-align: center;
+            margin: 0 0 12px 0;
+            color: #3d2a1a;
+            font-weight: 600;
+            font-size: 1.4rem;
+            border-bottom: 2px solid #b59e7c;
+            padding-bottom: 6px;
+        }
+        
+        .debug-log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 1rem;
+            color: #2c1e12;
+            white-space: pre-wrap;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
         }
         .record-panel h3 {
             text-align: center;
@@ -1200,6 +1232,13 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+                <div class="setting-item">
+                    <label>调试模式:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="debugMode">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
         
@@ -1279,7 +1318,7 @@
                 <div class="difficulty-option-name">大师 MASTER</div>
                 <div class="difficulty-option-desc">顶级挑战</div>
             </button>
-            <button class="difficulty-option" data-difficulty="5" onclick="selectDifficulty(5)" style="background: linear-gradient(90deg, #9c27b0, #ffffff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <button class="difficulty-option" data-difficulty="5" onclick="selectDifficulty(5)" style="background: linear-gradient(90deg, #9c27b0, #ffffff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;">
                 <div class="difficulty-option-icon">💎</div>
                 <div class="difficulty-option-name">宗师 Re:MASTER</div>
                 <div class="difficulty-option-desc">极限挑战</div>
@@ -1309,6 +1348,12 @@
         <ul class="move-list" id="moveList">
             <li style="opacity:0.6;">⚔️ 红先走</li>
         </ul>
+    </div>
+
+    <!-- 调试面板 -->
+    <div id="debugPanel" class="debug-panel" style="display: none;">
+        <h3>AI思考过程</h3>
+        <div id="debugLog" class="debug-log"></div>
     </div>
 
     <div class="board-area">
@@ -1440,7 +1485,8 @@ let gameSettings = {
     computeMode: 'gpu',
     hintEnabled: false,
     regretEnabled: true,
-    fenEnabled: false
+    fenEnabled: false,
+    debugMode: false
 };
 
 // 当前对局的AI难度
@@ -1468,6 +1514,7 @@ function saveSettings() {
     gameSettings.hintEnabled = document.getElementById('hintEnabled').checked;
     gameSettings.regretEnabled = document.getElementById('regretEnabled').checked;
     gameSettings.fenEnabled = document.getElementById('fenEnabled').checked;
+    gameSettings.debugMode = document.getElementById('debugMode').checked;
     
     // 更新全局变量
     computeMode = gameSettings.computeMode;
@@ -1486,6 +1533,7 @@ function updateSettingsUI() {
     document.getElementById('hintEnabled').checked = gameSettings.hintEnabled;
     document.getElementById('regretEnabled').checked = gameSettings.regretEnabled;
     document.getElementById('fenEnabled').checked = gameSettings.fenEnabled;
+    document.getElementById('debugMode').checked = gameSettings.debugMode || false;
 }
 
 // 界面切换函数
@@ -1585,6 +1633,14 @@ function selectDifficulty(difficulty) {
     // 应用设置到游戏
     applySettingsToGame();
     
+    // 根据调试模式设置显示调试面板
+    const debugPanel = document.getElementById('debugPanel');
+    if (gameSettings.debugMode) {
+        debugPanel.style.display = 'flex';
+    } else {
+        debugPanel.style.display = 'none';
+    }
+    
     // 初始化游戏
     restartGame();
 }
@@ -1600,7 +1656,7 @@ const difficultyNames = {
     2: '<span style="color: orange;">🗻进阶 ADVANCED</span>',
     3: '<span style="color: red;">👑专家 EXPERT</span>',
     4: '<span style="color: purple;">🏆大师 MASTER</span>',
-    5: '<span style="background: linear-gradient(90deg, #9c27b0, #ffffff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💎宗师 Re:MASTER</span>'
+    5: '<span style="background: linear-gradient(90deg, #9c27b0, #ffffff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;">💎宗师 Re:MASTER</span>'
 };
 
 // 更新AI难度显示
@@ -1621,7 +1677,7 @@ function applySettingsToGame() {
     const loadFenBtn = document.getElementById('loadFenBtn');
     
     // 确保gameSettings存在
-    const settings = window.gameSettings || {
+    const settings = gameSettings || {
         hintEnabled: false,
         regretEnabled: true,
         fenEnabled: false
@@ -2280,7 +2336,7 @@ self.onmessage = function(e) {
         return;
     }
     
-    const { board, difficulty, moveList, computeMode, isHint } = e.data;
+    const { board, difficulty, moveList, computeMode, isHint, debugMode } = e.data;
     
     // GPU优化：如果浏览器支持WebGPU，尝试使用GPU加速
     let useGPU = false;
@@ -2321,12 +2377,25 @@ self.onmessage = function(e) {
             return scoreB - scoreA;
         });
 
-        for (let move of moves) {
+        for (let i = 0; i < moves.length; i++) {
+            const move = moves[i];
+            
+            // 发送调试信息
+            if (debugMode) {
+                self.postMessage({
+                    type: 'debug',
+                    move: move,
+                    depth: searchDepth,
+                    moveIndex: i,
+                    totalMoves: moves.length
+                });
+            }
+            
             const newBoard = copyBoard(board);
             newBoard[move.fromRow][move.fromCol] = EMPTY;
             newBoard[move.toRow][move.toCol] = move.piece;
             
-            const score = minimax(newBoard, searchDepth - 1, -Infinity, Infinity, !isHint, searchDepth);
+            const score = minimax(newBoard, searchDepth - 1, -Infinity, Infinity, !isHint, searchDepth, debugMode);
             
             if (isHint) {
                 if (score > bestScore) {
@@ -3823,7 +3892,7 @@ self.onmessage = function(e) {
     }
 
     // 迭代加深搜索
-    function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
+    function minimax(b, depth, alpha, beta, isMaximizing, maxDepth, debugInfo) {
         // 静态评估 - 到达叶子节点
         if (depth === 0) {
             return quiescenceSearch(b, alpha, beta, isMaximizing, 8);
@@ -3886,12 +3955,31 @@ self.onmessage = function(e) {
         
         if (isMaximizing) {
             let maxEval = -Infinity;
-            for (let move of moves) {
+            let bestMove = null;
+            for (let i = 0; i < moves.length; i++) {
+                const move = moves[i];
+                
+                // 发送调试信息
+                if (debugInfo && depth === maxDepth) {
+                    self.postMessage({
+                        type: 'debug',
+                        move: move,
+                        depth: depth,
+                        moveIndex: i,
+                        totalMoves: moves.length
+                    });
+                }
+                
                 const newB = copyBoard(b);
                 newB[move.fromRow][move.fromCol] = EMPTY;
                 newB[move.toRow][move.toCol] = move.piece;
-                const evalScore = minimax(newB, depth - 1, alpha, beta, false, maxDepth);
-                maxEval = Math.max(maxEval, evalScore);
+                const evalScore = minimax(newB, depth - 1, alpha, beta, false, maxDepth, debugInfo);
+                
+                if (evalScore > maxEval) {
+                    maxEval = evalScore;
+                    bestMove = move;
+                }
+                
                 alpha = Math.max(alpha, evalScore);
                 
                 // 更新历史启发表
@@ -3904,11 +3992,24 @@ self.onmessage = function(e) {
             return maxEval;
         } else {
             let minEval = Infinity;
-            for (let move of moves) {
+            for (let i = 0; i < moves.length; i++) {
+                const move = moves[i];
+                
+                // 发送调试信息
+                if (debugInfo && depth === maxDepth) {
+                    self.postMessage({
+                        type: 'debug',
+                        move: move,
+                        depth: depth,
+                        moveIndex: i,
+                        totalMoves: moves.length
+                    });
+                }
+                
                 const newB = copyBoard(b);
                 newB[move.fromRow][move.fromCol] = EMPTY;
                 newB[move.toRow][move.toCol] = move.piece;
-                const evalScore = minimax(newB, depth - 1, alpha, beta, true, maxDepth);
+                const evalScore = minimax(newB, depth - 1, alpha, beta, true, maxDepth, debugInfo);
                 minEval = Math.min(minEval, evalScore);
                 beta = Math.min(beta, evalScore);
                 
@@ -3993,55 +4094,80 @@ self.onmessage = function(e) {
         if (!aiWorker) {
             aiWorker = new Worker(workerUrl);
             aiWorker.onmessage = function(e) {
-                const { move, gameOver: workerGameOver, useGPU } = e.data;
-                isAiThinking = false;
+            const { type, move, gameOver: workerGameOver, useGPU, moveIndex, totalMoves } = e.data;
+            
+            // 处理调试信息
+            if (type === 'debug' && gameSettings.debugMode) {
+                const debugPanel = document.getElementById('debugPanel');
+                const debugLog = document.getElementById('debugLog');
                 
-                clearInterval(aiTimerInterval);
-                const totalTime = (Date.now() - aiStartTime) / 1000;
-
-                if (workerGameOver) {
-                    gameOver = true;
-                    gameStatusEl.innerText = '红方胜利！';
+                if (debugPanel && debugLog) {
+                    debugPanel.style.display = 'flex';
+                    
+                    const moveInfo = move;
+                    const pieceName = getPieceName(moveInfo.piece);
+                    const fromPos = `${moveInfo.fromCol + 1},${9 - moveInfo.fromRow}`;
+                    const toPos = `${moveInfo.toCol + 1},${9 - moveInfo.toRow}`;
+                    
+                    const logMessage = `思考: ${pieceName} 从 ${fromPos} 到 ${toPos} (${moveIndex + 1}/${totalMoves})\n`;
+                    debugLog.textContent += logMessage;
+                    debugLog.scrollTop = debugLog.scrollHeight;
+                    
+                    // 在棋盘上显示AI正在思考的位置
                     drawBoard();
-                    // 清除当前对局（游戏已结束）
-                    localStorage.removeItem('currentGame');
-                    setTimeout(() => showGameOverModal('red-win', 'AI认输，红方获胜！'), 500);
-                    return;
+                    drawDebugInfo(moveInfo);
                 }
+                return;
+            }
+            
+            isAiThinking = false;
+            
+            clearInterval(aiTimerInterval);
+            const totalTime = (Date.now() - aiStartTime) / 1000;
 
-                if (!move) {
+            if (workerGameOver) {
+                gameOver = true;
+                gameStatusEl.innerText = '红方胜利！';
+                drawBoard();
+                // 清除当前对局（游戏已结束）
+                localStorage.removeItem('currentGame');
+                setTimeout(() => showGameOverModal('red-win', 'AI认输，红方获胜！'), 500);
+                return;
+            }
+
+            if (!move) {
+                gameOver = true;
+                gameStatusEl.innerText = '红方胜利！';
+                drawBoard();
+                // 清除当前对局（游戏已结束）
+                localStorage.removeItem('currentGame');
+                setTimeout(() => showGameOverModal('red-win', 'AI无棋可走，红方获胜！'), 500);
+                return;
+            }
+
+            const notation = generateNotation(move, 'black');
+            pushHistory(move, notation);
+
+            lastAiMove = { ...move };
+            
+            // 播放移动动画
+            animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
+                moveList.push(notation);
+                refreshMoveList();
+                drawBoard();
+
+                if (isCheckmate(board, 'red')) {
                     gameOver = true;
-                    gameStatusEl.innerText = '红方胜利！';
-                    drawBoard();
-                    // 清除当前对局（游戏已结束）
-                    localStorage.removeItem('currentGame');
-                    setTimeout(() => showGameOverModal('red-win', 'AI无棋可走，红方获胜！'), 500);
-                    return;
+                    gameStatusEl.innerText = 'AI胜利！';
+                    // 保存胜利记录
+                    saveCurrentGame();
+                    setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！'), 500);
+                } else {
+                    currentPlayer = 'red';
+                    gameStatusEl.innerText = '红方走棋';
                 }
-
-                const notation = generateNotation(move, 'black');
-                pushHistory(move, notation);
-
-                lastAiMove = { ...move };
-                
-                // 播放移动动画
-                animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
-                    moveList.push(notation);
-                    refreshMoveList();
-                    drawBoard();
-
-                    if (isCheckmate(board, 'red')) {
-                        gameOver = true;
-                        gameStatusEl.innerText = 'AI胜利！';
-                        // 保存胜利记录
-                        saveCurrentGame();
-                        setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！'), 500);
-                    } else {
-                        currentPlayer = 'red';
-                        gameStatusEl.innerText = '红方走棋';
-                    }
-                });
-            };
+            });
+        };
         }
 
         // 检查开局库
@@ -4085,7 +4211,8 @@ self.onmessage = function(e) {
             board: board,
             difficulty: difficulty,
             moveList: moveList,
-            computeMode: computeMode
+            computeMode: computeMode,
+            debugMode: gameSettings.debugMode
         });
     }
 
@@ -4129,6 +4256,38 @@ self.onmessage = function(e) {
             return moves[0];
         }
         return null;
+    }
+
+    // 获取棋子名称
+    function getPieceName(piece) {
+        const pieceNames = {
+            'R': '车', 'N': '马', 'B': '象', 'A': '士', 'K': '将', 'C': '炮', 'P': '兵',
+            'r': '车', 'n': '马', 'b': '象', 'a': '士', 'k': '将', 'c': '炮', 'p': '卒'
+        };
+        return pieceNames[piece] || piece;
+    }
+    
+    // 绘制调试信息
+    function drawDebugInfo(move) {
+        ctx.save();
+        
+        // 绘制源位置
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+        ctx.fillRect(move.fromCol * cellSize + padding, move.fromRow * cellSize + padding, cellSize, cellSize);
+        
+        // 绘制目标位置
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.fillRect(move.toCol * cellSize + padding, move.toRow * cellSize + padding, cellSize, cellSize);
+        
+        // 绘制箭头
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(move.fromCol * cellSize + padding + cellSize / 2, move.fromRow * cellSize + padding + cellSize / 2);
+        ctx.lineTo(move.toCol * cellSize + padding + cellSize / 2, move.toRow * cellSize + padding + cellSize / 2);
+        ctx.stroke();
+        
+        ctx.restore();
     }
 
     function drawBoard() {
