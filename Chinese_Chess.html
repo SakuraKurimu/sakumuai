@@ -2650,8 +2650,10 @@ self.onmessage = function(e) {
             return false;
         }
 
+        // 撤回两步：AI的一步和用户的一步
         history.pop();
         history.pop();
+        
         if (history.length > 0) {
             const last = history[history.length - 1];
             board = copyBoard(last.board);
@@ -2660,12 +2662,15 @@ self.onmessage = function(e) {
             board = getInitBoard();
             currentPlayer = 'red';
         }
+        
+        // 同步更新moveList
         if (moveList.length >= 2) {
             moveList.pop();
             moveList.pop();
         } else {
             moveList = [];
         }
+        
         selectedRow = -1; selectedCol = -1;
         currentHint = null;
         gameOver = false;
@@ -3047,10 +3052,12 @@ self.onmessage = function(e) {
         const piece = board[fromRow][fromCol];
         const move = { fromRow, fromCol, toRow, toCol, piece };
         const notation = generateNotation(move, 'red');
-        pushHistory(move, notation);
 
         // 播放移动动画
         animateMove(fromRow, fromCol, toRow, toCol, piece, () => {
+            // 在棋盘更新后保存历史记录
+            pushHistory(move, notation);
+            
             moveList.push(notation);
             refreshMoveList();
 
@@ -4146,12 +4153,14 @@ self.onmessage = function(e) {
             }
 
             const notation = generateNotation(move, 'black');
-            pushHistory(move, notation);
 
             lastAiMove = { ...move };
             
             // 播放移动动画
             animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
+                // 在棋盘更新后保存历史记录
+                pushHistory(move, notation);
+                
                 moveList.push(notation);
                 refreshMoveList();
                 drawBoard();
@@ -4182,11 +4191,13 @@ self.onmessage = function(e) {
                     const totalTime = (Date.now() - aiStartTime) / 1000;
                     
                     const notation = generateNotation(move, 'black');
-                    pushHistory(move, notation);
                     
                     lastAiMove = { ...move };
                     
                     animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
+                        // 在棋盘更新后保存历史记录
+                        pushHistory(move, notation);
+                        
                         moveList.push(notation);
                         refreshMoveList();
                         drawBoard();
