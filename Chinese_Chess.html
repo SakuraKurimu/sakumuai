@@ -2576,8 +2576,7 @@ self.onmessage = function(e) {
         return src.map(row => [...row]);
     }
 
-    function pushHistory(move, notation) {
-        const capturedPiece = board[move.toRow][move.toCol];
+    function pushHistory(move, notation, capturedPiece) {
         history.push({
             board: copyBoard(board),
             move: { ...move },
@@ -3050,13 +3049,14 @@ self.onmessage = function(e) {
 
     function executeMove(fromRow, fromCol, toRow, toCol) {
         const piece = board[fromRow][fromCol];
+        const capturedPiece = board[toRow][toCol];
         const move = { fromRow, fromCol, toRow, toCol, piece };
         const notation = generateNotation(move, 'red');
 
         // 播放移动动画
         animateMove(fromRow, fromCol, toRow, toCol, piece, () => {
             // 在棋盘更新后保存历史记录
-            pushHistory(move, notation);
+            pushHistory(move, notation, capturedPiece);
             
             moveList.push(notation);
             refreshMoveList();
@@ -4153,13 +4153,14 @@ self.onmessage = function(e) {
             }
 
             const notation = generateNotation(move, 'black');
+            const capturedPiece = board[move.toRow][move.toCol];
 
             lastAiMove = { ...move };
             
             // 播放移动动画
             animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
                 // 在棋盘更新后保存历史记录
-                pushHistory(move, notation);
+                pushHistory(move, notation, capturedPiece);
                 
                 moveList.push(notation);
                 refreshMoveList();
@@ -4185,6 +4186,7 @@ self.onmessage = function(e) {
             // 如果在开局库中，直接使用开局库的走法
             const move = notationToMove(openingMove, board, 'black');
             if (move) {
+                const capturedPiece = board[move.toRow][move.toCol];
                 setTimeout(() => {
                     isAiThinking = false;
                     clearInterval(aiTimerInterval);
@@ -4196,7 +4198,7 @@ self.onmessage = function(e) {
                     
                     animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
                         // 在棋盘更新后保存历史记录
-                        pushHistory(move, notation);
+                        pushHistory(move, notation, capturedPiece);
                         
                         moveList.push(notation);
                         refreshMoveList();
