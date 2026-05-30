@@ -105,6 +105,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            position: relative;
         }
         canvas {
             display: block;
@@ -1160,6 +1161,50 @@
             background: #4a6b5a;
             transform: translateY(-1px);
         }
+
+        .opening-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(255, 245, 225, 0.92) 0%, rgba(232, 213, 181, 0.65) 55%, rgba(232, 213, 181, 0.0) 100%);
+            border-radius: 18px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .opening-overlay.show {
+            display: flex;
+            animation: openingOverlay 0.9s ease-out forwards;
+        }
+
+        .opening-text {
+            font-family: 'KaiTi', '楷体', serif;
+            font-size: 64px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            color: rgba(61, 40, 14, 0.92);
+            text-shadow: 0 10px 20px rgba(0,0,0,0.25);
+            transform: translateY(-6px);
+        }
+
+        @keyframes openingOverlay {
+            0% { opacity: 0; transform: scale(1.02); }
+            20% { opacity: 1; transform: scale(1); }
+            70% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.985); }
+        }
+
+        .game-container.entering {
+            animation: gameEnter 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+
+        @keyframes gameEnter {
+            0% { opacity: 0; transform: translateY(10px) scale(0.985); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -1224,6 +1269,17 @@
                         <input type="checkbox" id="regretEnabled" checked>
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+                <div class="setting-item">
+                    <label>悔棋次数:</label>
+                    <select id="regretLimit" class="setting-select">
+                        <option value="auto" selected>自动(按难度)</option>
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="5">5</option>
+                    </select>
                 </div>
                 <div class="setting-item">
                     <label>启用FEN保存和导入:</label>
@@ -1332,10 +1388,10 @@
     <div class="game-over-content" id="gameOverContent">
         <div class="game-over-icon" id="gameOverIcon">🏆</div>
         <div class="game-over-title" id="gameOverTitle">游戏结束</div>
+        <div class="game-over-checkmate" id="gameOverCheckmate" style="display: none; font-size: 1.5em; color: #ff6b6b; margin: 10px 0; font-weight: bold;"></div>
         <div class="game-over-message" id="gameOverMessage">胜负已分</div>
         <div class="game-over-buttons">
-            <button class="game-over-btn game-over-btn-primary" onclick="closeGameOverModal(); showDifficultyModal();">再来一局</button>
-            <button class="game-over-btn game-over-btn-secondary" onclick="closeGameOverModal(); showMainMenu();">返回菜单</button>
+            <button class="game-over-btn game-over-btn-primary" onclick="closeGameOverModal();">确定</button>
         </div>
     </div>
 </div>
@@ -1358,6 +1414,9 @@
 
     <div class="board-area">
         <canvas id="chessCanvas"></canvas>
+        <div id="openingOverlay" class="opening-overlay">
+            <div class="opening-text">开局</div>
+        </div>
     </div>
 
     <div class="control-panel">
@@ -1413,12 +1472,13 @@ function closeModal() {
 }
 
 // 游戏结束弹窗管理
-function showGameOverModal(result, message) {
+function showGameOverModal(result, message, checkmateType) {
     const modal = document.getElementById('gameOverModal');
     const icon = document.getElementById('gameOverIcon');
     const title = document.getElementById('gameOverTitle');
     const msg = document.getElementById('gameOverMessage');
     const content = document.getElementById('gameOverContent');
+    const checkmateEl = document.getElementById('gameOverCheckmate');
     
     // 清除之前的彩纸
     const oldConfetti = modal.querySelectorAll('.confetti');
@@ -1428,6 +1488,14 @@ function showGameOverModal(result, message) {
     content.style.animation = 'none';
     content.offsetHeight; // 触发重排
     content.style.animation = 'gameOverPopIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+    
+    // 显示杀法类型
+    if (checkmateType && checkmateType !== '将死') {
+        checkmateEl.style.display = 'block';
+        checkmateEl.textContent = '🏷️ ' + checkmateType;
+    } else {
+        checkmateEl.style.display = 'none';
+    }
     
     // 根据结果显示不同的内容
     if (result === 'red-win') {
@@ -1461,9 +1529,43 @@ function showGameOverModal(result, message) {
 function closeGameOverModal() {
     const modal = document.getElementById('gameOverModal');
     modal.classList.remove('show');
-    // 清除彩纸
-    const confetti = modal.querySelectorAll('.confetti');
-    confetti.forEach(c => c.remove());
+    disableGameControls();
+}
+
+function disableGameControls() {
+    const saveFenBtn = document.getElementById('saveFenBtn');
+    const loadFenBtn = document.getElementById('loadFenBtn');
+    const hintBtn = document.getElementById('hintBtn');
+    const regretBtn = document.getElementById('regretBtn');
+    const drawBtn = document.getElementById('drawBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const backToMenuBtn = document.getElementById('backToMenuBtn');
+    
+    [saveFenBtn, loadFenBtn, hintBtn, regretBtn, drawBtn].forEach(btn => {
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        }
+    });
+}
+
+function enableGameControls() {
+    const saveFenBtn = document.getElementById('saveFenBtn');
+    const loadFenBtn = document.getElementById('loadFenBtn');
+    const hintBtn = document.getElementById('hintBtn');
+    const regretBtn = document.getElementById('regretBtn');
+    const drawBtn = document.getElementById('drawBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const backToMenuBtn = document.getElementById('backToMenuBtn');
+    
+    [saveFenBtn, loadFenBtn, hintBtn, regretBtn, drawBtn].forEach(btn => {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        }
+    });
 }
 
 // 创建彩纸效果
@@ -1485,6 +1587,7 @@ let gameSettings = {
     computeMode: 'gpu',
     hintEnabled: false,
     regretEnabled: true,
+    regretLimit: 'auto',
     fenEnabled: false,
     debugMode: false
 };
@@ -1513,6 +1616,7 @@ function saveSettings() {
     gameSettings.computeMode = document.getElementById('menuComputeMode').value;
     gameSettings.hintEnabled = document.getElementById('hintEnabled').checked;
     gameSettings.regretEnabled = document.getElementById('regretEnabled').checked;
+    gameSettings.regretLimit = document.getElementById('regretLimit').value;
     gameSettings.fenEnabled = document.getElementById('fenEnabled').checked;
     gameSettings.debugMode = document.getElementById('debugMode').checked;
     
@@ -1532,6 +1636,7 @@ function updateSettingsUI() {
     document.getElementById('menuComputeMode').value = gameSettings.computeMode;
     document.getElementById('hintEnabled').checked = gameSettings.hintEnabled;
     document.getElementById('regretEnabled').checked = gameSettings.regretEnabled;
+    document.getElementById('regretLimit').value = gameSettings.regretLimit || 'auto';
     document.getElementById('fenEnabled').checked = gameSettings.fenEnabled;
     document.getElementById('debugMode').checked = gameSettings.debugMode || false;
 }
@@ -1542,6 +1647,7 @@ function showMainMenu() {
     document.getElementById('settingsMenu').style.display = 'none';
     document.getElementById('recordsMenu').style.display = 'none';
     document.getElementById('gameContainer').style.display = 'none';
+    enableGameControls();
     
     // 检查是否有未完成的对局
     const savedGame = localStorage.getItem('currentGame');
@@ -1628,7 +1734,11 @@ function selectDifficulty(difficulty) {
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('settingsMenu').style.display = 'none';
     document.getElementById('recordsMenu').style.display = 'none';
-    document.getElementById('gameContainer').style.display = 'flex';
+    const gameContainer = document.getElementById('gameContainer');
+    gameContainer.style.display = 'flex';
+    gameContainer.classList.remove('entering');
+    gameContainer.offsetHeight;
+    gameContainer.classList.add('entering');
     
     // 应用设置到游戏
     applySettingsToGame();
@@ -1643,6 +1753,9 @@ function selectDifficulty(difficulty) {
     
     // 初始化游戏
     restartGame();
+    if (window.playOpeningAnimation) {
+        window.playOpeningAnimation();
+    }
 }
 
 
@@ -1698,6 +1811,9 @@ function applySettingsToGame() {
     
     // 更新AI难度显示
     updateAiDifficultyDisplay();
+    if (window.updateRegretButtonText) {
+        window.updateRegretButtonText();
+    }
 }
 
 // 游戏全局变量
@@ -1804,12 +1920,6 @@ function saveGameRecords() {
 
 
 
-// 页面加载时初始化
-window.onload = function() {
-    loadSettings();
-    showMainMenu();
-};
-
 (function(){
     const ROWS = 10;
     const COLS = 9;
@@ -1845,11 +1955,66 @@ window.onload = function() {
     let computeMode = 'gpu';
     let lastAiMove = null;
     let currentHint = null;
+    let regretRemaining = Infinity;
+    let isInOpeningAnimation = false;
     
     // 用于检测反复摩擦走子的历史记录
     let movePatterns = [];
     let maxPatternLength = 10; // 最多存储10个最近的走子模式
     let frictionThreshold = 5; // 当相同模式出现5次时，认为是反复摩擦
+
+    function getDefaultRegretLimitByDifficulty(difficulty) {
+        if (difficulty === 4) return 1;
+        if (difficulty === 5) return 0;
+        return 3;
+    }
+
+    function getConfiguredRegretLimit(difficulty) {
+        const settings = window.gameSettings || {};
+        const v = settings.regretLimit ?? 'auto';
+        if (v === 'auto') return getDefaultRegretLimitByDifficulty(difficulty);
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n)) return Math.max(0, n);
+        return getDefaultRegretLimitByDifficulty(difficulty);
+    }
+
+    function updateRegretButtonText() {
+        const btn = document.getElementById('regretBtn');
+        if (!btn) return;
+        const settings = window.gameSettings || {};
+        if (!settings.regretEnabled) return;
+        const remainText = regretRemaining === Infinity ? '∞' : String(regretRemaining);
+        btn.textContent = `↩️ 悔棋 (${remainText})`;
+        btn.disabled = (regretRemaining !== Infinity && regretRemaining <= 0);
+    }
+
+    function resetRegretLimitForNewGame() {
+        const settings = window.gameSettings || {};
+        if (!settings.regretEnabled) {
+            regretRemaining = 0;
+            updateRegretButtonText();
+            return;
+        }
+        const difficulty = window.currentGameDifficulty ?? 1;
+        regretRemaining = getConfiguredRegretLimit(difficulty);
+        updateRegretButtonText();
+    }
+
+    function playOpeningAnimation() {
+        const gameContainer = document.getElementById('gameContainer');
+        if (!gameContainer || gameContainer.style.display === 'none') return;
+        const overlay = document.getElementById('openingOverlay');
+        isInOpeningAnimation = true;
+        if (overlay) {
+            overlay.classList.remove('show');
+            overlay.offsetHeight;
+            overlay.classList.add('show');
+        }
+        setTimeout(() => {
+            isInOpeningAnimation = false;
+            if (overlay) overlay.classList.remove('show');
+        }, 900);
+    }
 
     function saveCurrentGame() {
         // 只有有走子记录时才保存
@@ -2056,7 +2221,7 @@ function isValidAttack(board, piece, fromRow, fromCol, toRow, toCol) {
             }
             // 炮只有在吃子的时候才攻击，此时需要中间有一个棋子
             if (targetPiece !== EMPTY) return cnt === 1;
-            return false;
+            return cnt === 0;
         }
     if (p === 'p') {
         if (piece === 'P') {
@@ -2177,47 +2342,82 @@ function getPosBonus(piece, row, col) {
     return 0;
 }
 
+function buildMobilityMap(moves) {
+    const map = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    for (let i = 0; i < moves.length; i++) {
+        const m = moves[i];
+        map[m.fromRow][m.fromCol] += 1;
+    }
+    return map;
+}
+
+function buildAttackMap(board, attackerColor) {
+    const attack = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const piece = board[r][c];
+            if (!piece) continue;
+            if (getPieceColor(piece) !== attackerColor) continue;
+            for (let tr = 0; tr < ROWS; tr++) {
+                for (let tc = 0; tc < COLS; tc++) {
+                    if (r === tr && c === tc) continue;
+                    const target = board[tr][tc];
+                    if (target && sameColor(piece, target)) continue;
+                    if (isValidAttack(board, piece, r, c, tr, tc)) {
+                        attack[tr][tc] = true;
+                    }
+                }
+            }
+        }
+    }
+    return attack;
+}
+
 function evaluateBoard(b) {
     let score = 0;
-    let redMaterial = 0, blackMaterial = 0;
-    
+
+    const redMoves = getAllLegalMoves(b, 'red');
+    const blackMoves = getAllLegalMoves(b, 'black');
+    const redMob = buildMobilityMap(redMoves);
+    const blackMob = buildMobilityMap(blackMoves);
+
+    const redAtk = buildAttackMap(b, 'red');
+    const blackAtk = buildAttackMap(b, 'black');
+
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             const p = b[r][c];
             if (!p) continue;
-            
-            let val = pieceValues[p] || 0;
-            val += getPosBonus(p, r, c);
-            
-            const moves = getAllLegalMoves(b, getPieceColor(p));
-            const pieceMoves = moves.filter(m => m.fromRow === r && m.fromCol === c).length;
-            val += pieceMoves * 5;
-            
-            if (p === p.toLowerCase()) {
-                score -= val;
-                blackMaterial += pieceValues[p];
-            } else {
-                score += val;
-                redMaterial += pieceValues[p];
+
+            const color = getPieceColor(p);
+            const base = pieceValues[p] || 0;
+            let val = base + getPosBonus(p, r, c);
+            val += (color === 'red' ? redMob[r][c] : blackMob[r][c]) * 3;
+
+            const attacked = (color === 'red') ? blackAtk[r][c] : redAtk[r][c];
+            const defended = (color === 'red') ? redAtk[r][c] : blackAtk[r][c];
+            if (attacked) {
+                val -= defended ? base * 0.12 : base * 0.28;
             }
+
+            score += (color === 'red') ? val : -val;
         }
     }
-    
-    if (isInCheck(b, 'red')) score -= 150;
-    if (isInCheck(b, 'black')) score += 150;
-    
+
+    score += (redMoves.length - blackMoves.length) * 2;
+
+    if (isInCheck(b, 'red')) score -= 220;
+    if (isInCheck(b, 'black')) score += 260;
+
     if (isCheckmate(b, 'red')) score -= 50000;
     if (isCheckmate(b, 'black')) score += 50000;
-    
-    // 根据策略调整评分
+
     if (aiStrategy === 'aggressive') {
-        // 更积极的进攻策略
-        score *= 1.2;
+        score *= 1.15;
     } else if (aiStrategy === 'defensive') {
-        // 更保守的防御策略
-        score *= 0.8;
+        score *= 0.9;
     }
-    
+
     return score;
 }
 
@@ -2243,6 +2443,7 @@ function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
     const moves = getAllLegalMoves(b, color);
     
     const captureMoves = moves.filter(m => b[m.toRow][m.toCol] !== EMPTY);
+    captureMoves.sort((a, bb) => (pieceValues[b[bb.toRow][bb.toCol]] || 0) - (pieceValues[b[a.toRow][a.toCol]] || 0));
     
     if (isMaximizing) {
         for (let move of captureMoves) {
@@ -2273,24 +2474,45 @@ function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
     }
 }
 
+function withTemporaryMove(board, move, fn) {
+    const piece = board[move.fromRow][move.fromCol];
+    const captured = board[move.toRow][move.toCol];
+    board[move.fromRow][move.fromCol] = EMPTY;
+    board[move.toRow][move.toCol] = piece;
+    const result = fn();
+    board[move.fromRow][move.fromCol] = piece;
+    board[move.toRow][move.toCol] = captured;
+    return result;
+}
+
+function scoreMoveForOrdering(board, move, moverColor) {
+    let score = 0;
+    const captured = board[move.toRow][move.toCol];
+    if (captured) score += (pieceValues[captured] || 0) * 100;
+    score += getPosBonus(move.piece, move.toRow, move.toCol) - getPosBonus(move.piece, move.fromRow, move.fromCol);
+    const opponent = moverColor === 'red' ? 'black' : 'red';
+    score += withTemporaryMove(board, move, () => isInCheck(board, opponent) ? 50000 : 0);
+    return score;
+}
+
 function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
     if (depth === 0) {
         return quiescenceSearch(b, alpha, beta, isMaximizing, 8);
     }
     
     const color = isMaximizing ? 'red' : 'black';
-    const moves = getAllLegalMoves(b, color);
+    let moves = getAllLegalMoves(b, color);
     
     if (moves.length === 0) {
         return isMaximizing ? -100000 - depth : 100000 + depth;
     }
     
-    moves.sort((moveA, moveB) => {
-        let scoreA = 0, scoreB = 0;
-        if (b[moveA.toRow][moveA.toCol]) scoreA += pieceValues[b[moveA.toRow][moveA.toCol]] || 0;
-        if (b[moveB.toRow][moveB.toCol]) scoreB += pieceValues[b[moveB.toRow][moveB.toCol]] || 0;
-        return scoreB - scoreA;
-    });
+    const scored = new Array(moves.length);
+    for (let i = 0; i < moves.length; i++) {
+        scored[i] = { move: moves[i], score: scoreMoveForOrdering(b, moves[i], color) };
+    }
+    scored.sort((a, bb) => bb.score - a.score);
+    moves = scored.map(x => x.move);
     
     if (isMaximizing) {
         let maxEval = -Infinity;
@@ -2644,6 +2866,15 @@ self.onmessage = function(e) {
             showModal('提示', '请在您的回合点击悔棋');
             return false;
         }
+        const settings = window.gameSettings || {};
+        if (!settings.regretEnabled) {
+            showModal('提示', '当前已关闭悔棋功能');
+            return false;
+        }
+        if (regretRemaining !== Infinity && regretRemaining <= 0) {
+            showModal('提示', '本局悔棋次数已用尽');
+            return false;
+        }
         if (history.length < 2) {
             showModal('提示', '没有足够的步数可以悔棋');
             return false;
@@ -2687,6 +2918,10 @@ self.onmessage = function(e) {
         refreshMoveList();
         drawBoard();
         gameStatusEl.innerText = '红方走棋';
+        if (regretRemaining !== Infinity) {
+            regretRemaining = Math.max(0, regretRemaining - 1);
+        }
+        updateRegretButtonText();
         return true;
     }
 
@@ -2913,6 +3148,203 @@ self.onmessage = function(e) {
         return moves;
     }
 
+    function detectCheckmateType(board, color) {
+        const kingPiece = color === 'red' ? 'k' : 'K';
+        const attackerColor = color === 'red' ? 'black' : 'red';
+        let kingRow, kingCol;
+        
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (board[r][c] === kingPiece) {
+                    kingRow = r;
+                    kingCol = c;
+                }
+            }
+        }
+        
+        if (kingRow === undefined) return '将死';
+        
+        const attackers = [];
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const piece = board[r][c];
+                if (piece && getPieceColor(piece) === attackerColor) {
+                    if (isValidAttack(board, piece, r, c, kingRow, kingCol)) {
+                        attackers.push({ piece, row: r, col: c });
+                    }
+                }
+            }
+        }
+        
+        if (attackers.length === 0) return '将死';
+        
+        if (attackers.length === 2) {
+            return '双将';
+        }
+        
+        const attacker = attackers[0];
+        const pieceType = attacker.piece.toLowerCase();
+        
+        const hasCar = (color === 'red') ? 
+            (board[kingRow][0] === 'r' || board[kingRow][8] === 'r') :
+            (board[kingRow][0] === 'R' || board[kingRow][8] === 'R');
+        
+        if (pieceType === 'r') {
+            if (hasCar) {
+                return '臣压君';
+            }
+            if (attacker.col === kingCol) {
+                if (attacker.row === (color === 'red' ? 0 : 9)) {
+                    return '大刀剜心';
+                }
+            }
+            let otherCar = null;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const p = board[r][c];
+                    if (p && p.toLowerCase() === 'r' && getPieceColor(p) === attackerColor && 
+                        !(r === attacker.row && c === attacker.col)) {
+                        otherCar = { row: r, col: c };
+                        break;
+                    }
+                }
+                if (otherCar) break;
+            }
+            if (otherCar) {
+                if (attacker.row === otherCar.row) {
+                    return '双车错';
+                }
+                if ((attacker.col === kingCol && otherCar.row === kingRow) ||
+                    (otherCar.col === kingCol && attacker.row === kingRow)) {
+                    return '铁门闩';
+                }
+            }
+            return '将死';
+        }
+        
+        if (pieceType === 'n') {
+            if ((kingRow === 0 && kingCol === 4) || (kingRow === 9 && kingCol === 4)) {
+                return '八角马';
+            }
+            const isWocaoMa = (color === 'red' && attacker.row === 7 && (attacker.col === 2 || attacker.col === 6)) ||
+                              (color === 'black' && attacker.row === 2 && (attacker.col === 2 || attacker.col === 6));
+            if (isWocaoMa) {
+                let hasPao = false;
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const p = board[r][c];
+                        if (p && p.toLowerCase() === 'c' && getPieceColor(p) === attackerColor) {
+                            hasPao = true;
+                            break;
+                        }
+                    }
+                    if (hasPao) break;
+                }
+                if (hasPao) {
+                    return '马后炮';
+                }
+                return '卧槽马';
+            }
+            const isDiaoyuma = (color === 'red' && attacker.row === 8 && (attacker.col === 2 || attacker.col === 6)) ||
+                               (color === 'black' && attacker.row === 1 && (attacker.col === 2 || attacker.col === 6));
+            if (isDiaoyuma) return '钓鱼马';
+            const isCemianhu = (color === 'red' && attacker.row === 9 && (attacker.col === 3 || attacker.col === 5)) ||
+                               (color === 'black' && attacker.row === 0 && (attacker.col === 3 || attacker.col === 5));
+            if (isCemianhu) return '侧面虎';
+            return '将死';
+        }
+        
+        if (pieceType === 'c') {
+            let otherPao = null;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const p = board[r][c];
+                    if (p && p.toLowerCase() === 'c' && getPieceColor(p) === attackerColor && 
+                        !(r === attacker.row && c === attacker.col)) {
+                        otherPao = { row: r, col: c };
+                        break;
+                    }
+                }
+                if (otherPao) break;
+            }
+            if (otherPao) {
+                if (attacker.row === otherPao.row || attacker.col === otherPao.col) {
+                    return '重炮';
+                }
+                if ((attacker.row <= 4 && otherPao.row >= 5) || (attacker.row >= 5 && otherPao.row <= 4)) {
+                    return '天地炮';
+                }
+            }
+            let hasCar = false;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const p = board[r][c];
+                    if (p && p.toLowerCase() === 'r' && getPieceColor(p) === attackerColor) {
+                        hasCar = true;
+                        break;
+                    }
+                }
+                if (hasCar) break;
+            }
+            if (hasCar) return '夹车炮';
+            return '将死';
+        }
+        
+        if (pieceType === 'p') {
+            const isLaozushoushan = (color === 'red' && attacker.row <= 1) || 
+                                    (color === 'black' && attacker.row >= 8);
+            if (isLaozushoushan) return '老卒搜山';
+            let pawnCount = 0;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const p = board[r][c];
+                    if (p && p.toLowerCase() === 'p' && getPieceColor(p) === attackerColor) {
+                        pawnCount++;
+                    }
+                }
+            }
+            if (pawnCount >= 3) {
+                return '三进兵';
+            }
+            if (pawnCount === 2) {
+                return '二鬼拍门';
+            }
+            if (attacker.row === kingRow && Math.abs(attacker.col - kingCol) === 1) {
+                return '送佛归殿';
+            }
+            return '将死';
+        }
+        
+        if (pieceType === 'r' && (kingCol === 4 && Math.abs(attacker.row - kingRow) <= 1)) {
+            return '大胆穿心';
+        }
+        
+        let otherKing = null;
+        const otherKingPiece = color === 'red' ? 'K' : 'k';
+        for (let r = 0; r < ROWS; r++) {
+            if (board[r][kingCol] === otherKingPiece) {
+                otherKing = { row: r };
+                break;
+            }
+        }
+        if (otherKing) {
+            let blocked = false;
+            const minRow = Math.min(otherKing.row, kingRow);
+            const maxRow = Math.max(otherKing.row, kingRow);
+            for (let r = minRow + 1; r < maxRow; r++) {
+                if (board[r][kingCol] !== EMPTY) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (!blocked) {
+                return '对面笑';
+            }
+        }
+        
+        return '将死';
+    }
+
     function isCheckmate(board, color) {
         const moves = getAllLegalMoves(board, color);
         return moves.length === 0;
@@ -3072,7 +3504,8 @@ self.onmessage = function(e) {
                 gameStatusEl.innerText = '红方胜利！';
                 // 保存胜利记录
                 saveCurrentGame();
-                setTimeout(() => showGameOverModal('red-win', '红方绝杀黑方，获得胜利！'), 500);
+                const checkmateType = detectCheckmateType(board, 'black');
+                setTimeout(() => showGameOverModal('red-win', '红方绝杀黑方，获得胜利！', checkmateType), 500);
                 return;
             }
 
@@ -3087,6 +3520,7 @@ self.onmessage = function(e) {
 
 
     function handleCanvasClick(e) {
+        if (isInOpeningAnimation) return;
         if (gameOver || currentPlayer !== 'red') return;
 
         const rect = canvas.getBoundingClientRect();
@@ -4083,6 +4517,7 @@ self.onmessage = function(e) {
 
     // AI走棋
     function aiMakeMove() {
+        if (isInOpeningAnimation) return;
         if (gameOver || currentPlayer === 'red' || isAiThinking) return;
 
         isAiThinking = true;
@@ -4138,7 +4573,7 @@ self.onmessage = function(e) {
                 drawBoard();
                 // 清除当前对局（游戏已结束）
                 localStorage.removeItem('currentGame');
-                setTimeout(() => showGameOverModal('red-win', 'AI认输，红方获胜！'), 500);
+                setTimeout(() => showGameOverModal('red-win', 'AI认输，红方获胜！', '将死'), 500);
                 return;
             }
 
@@ -4148,7 +4583,7 @@ self.onmessage = function(e) {
                 drawBoard();
                 // 清除当前对局（游戏已结束）
                 localStorage.removeItem('currentGame');
-                setTimeout(() => showGameOverModal('red-win', 'AI无棋可走，红方获胜！'), 500);
+                setTimeout(() => showGameOverModal('red-win', 'AI无棋可走，红方获胜！', '将死'), 500);
                 return;
             }
 
@@ -4171,7 +4606,8 @@ self.onmessage = function(e) {
                     gameStatusEl.innerText = 'AI胜利！';
                     // 保存胜利记录
                     saveCurrentGame();
-                    setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！'), 500);
+                    const checkmateType = detectCheckmateType(board, 'red');
+                    setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！', checkmateType), 500);
                 } else {
                     currentPlayer = 'red';
                     gameStatusEl.innerText = '红方走棋';
@@ -4209,7 +4645,8 @@ self.onmessage = function(e) {
                             gameStatusEl.innerText = 'AI胜利！';
                             // 保存胜利记录
                             saveCurrentGame();
-                            setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！'), 500);
+                            const checkmateType = detectCheckmateType(board, 'red');
+                            setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！', checkmateType), 500);
                         } else {
                             currentPlayer = 'red';
                             gameStatusEl.innerText = '红方走棋';
@@ -4263,10 +4700,11 @@ self.onmessage = function(e) {
 
     // 从棋子记谱转换为坐标
     function notationToMove(notation, board, color) {
-        // 简化实现：返回所有合法走法中的第一个
         const moves = getAllLegalMoves(board, color);
-        if (moves.length > 0) {
-            return moves[0];
+        for (let i = 0; i < moves.length; i++) {
+            const m = moves[i];
+            const n = generateNotation(m, color);
+            if (n === notation) return m;
         }
         return null;
     }
@@ -4400,25 +4838,35 @@ self.onmessage = function(e) {
                                 if (getPieceColor(targetPiece) !== getPieceColor(selectedPiece)) {
                                     const pt = getPointFromCell(r, c);
                                     // 绘制可吃子标记
+                                    ctx.save();
                                     ctx.beginPath();
-                                    ctx.fillStyle = 'rgba(255, 100, 100, 0.6)';
-                                    ctx.arc(pt.x, pt.y, cellSize * 0.3, 0, 2 * Math.PI);
+                                    ctx.fillStyle = 'rgba(255, 90, 90, 0.65)';
+                                    ctx.arc(pt.x, pt.y, cellSize * 0.32, 0, 2 * Math.PI);
+                                    ctx.shadowColor = 'rgba(255, 0, 0, 0.45)';
+                                    ctx.shadowBlur = 12;
                                     ctx.fill();
-                                    ctx.strokeStyle = 'rgba(255, 50, 50, 0.9)';
-                                    ctx.lineWidth = 2;
+                                    ctx.shadowBlur = 0;
+                                    ctx.strokeStyle = 'rgba(180, 0, 0, 0.95)';
+                                    ctx.lineWidth = 4;
                                     ctx.stroke();
                                     
                                     // 显示被吃的棋子
                                     const capturedPieceChar = pieceToChinese(targetPiece, 'red');
-                                    ctx.fillStyle = 'rgba(255, 50, 50, 0.9)';
+                                    ctx.fillStyle = 'rgba(170, 0, 0, 0.95)';
                                     ctx.font = 'bold 14px "Arial", sans-serif';
                                     ctx.textAlign = 'center';
                                     ctx.textBaseline = 'middle';
                                     ctx.fillText(capturedPieceChar, pt.x, pt.y);
                                     
+                                    // 目标红色高亮
+                                    ctx.beginPath();
+                                    ctx.arc(pt.x, pt.y, cellSize * 0.42, 0, 2 * Math.PI);
+                                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.75)';
+                                    ctx.lineWidth = 3;
+                                    ctx.stroke();
+                                    ctx.restore();
+                                    
                                     // 绘制从炮架到目标的虚线路径
-                                    const platformRow = selectedRow + dr;
-                                    const platformCol = selectedCol + dc;
                                     // 找到炮架位置
                                     let pr = selectedRow + dr;
                                     let pc = selectedCol + dc;
@@ -4428,14 +4876,16 @@ self.onmessage = function(e) {
                                     }
                                     if (pr >= 0 && pr < ROWS && pc >= 0 && pc < COLS && board[pr][pc] !== EMPTY) {
                                         const platformPt = getPointFromCell(pr, pc);
+                                        ctx.save();
                                         ctx.beginPath();
                                         ctx.moveTo(platformPt.x, platformPt.y);
                                         ctx.lineTo(pt.x, pt.y);
-                                        ctx.strokeStyle = 'rgba(255, 100, 100, 0.7)';
-                                        ctx.lineWidth = 2;
-                                        ctx.setLineDash([4, 4]);
+                                        ctx.strokeStyle = 'rgba(255, 70, 70, 0.9)';
+                                        ctx.lineWidth = 4;
+                                        ctx.setLineDash([8, 6]);
                                         ctx.stroke();
                                         ctx.setLineDash([]);
+                                        ctx.restore();
                                     }
                                 }
                                 break; // 找到第一个可吃子就停止
@@ -4473,7 +4923,7 @@ self.onmessage = function(e) {
                     ctx.arc(pt.x, pt.y, cellSize * 0.25, 0, 2 * Math.PI);
                     ctx.fill();
                 } else if (isDangerous && isProtected) {
-                    ctx.fillStyle = 'rgba(50, 100, 255, 0.5)';
+                    ctx.fillStyle = 'rgba(255, 215, 0, 0.55)';
                     ctx.arc(pt.x, pt.y, cellSize * 0.25, 0, 2 * Math.PI);
                     ctx.fill();
                 } else {
@@ -4648,7 +5098,7 @@ self.onmessage = function(e) {
             
             // 显示和局提示
             gameStatusEl.innerText = '和局';
-            setTimeout(() => showGameOverModal('draw', '双方达成和局，平分秋色！'), 300);
+            setTimeout(() => showGameOverModal('draw', '双方达成和局，平分秋色！', '将死'), 300);
         });
     }
 
@@ -4664,10 +5114,6 @@ self.onmessage = function(e) {
     const backToMenuBtn = document.getElementById('backToMenuBtn');
     const saveFenBtn = document.getElementById('saveFenBtn');
     const loadFenBtn = document.getElementById('loadFenBtn');
-
-    hintBtn.addEventListener('click', () => {
-        showHint();
-    });
 
     regretBtn.addEventListener('click', () => {
         regretMove();
@@ -4689,37 +5135,6 @@ self.onmessage = function(e) {
             saveCurrentGame();
             showMainMenu();
         });
-    });
-
-    saveFenBtn.addEventListener('click', () => {
-        const fen = boardToFen();
-        prompt('请复制以下FEN字符串：', fen);
-    });
-
-    loadFenBtn.addEventListener('click', () => {
-        const fen = prompt('请输入FEN字符串：');
-        if (!fen) return;
-        
-        const result = fenToBoard(fen);
-        if (!result) {
-            showModal('错误', '无效的FEN格式！');
-            return;
-        }
-        
-        board = result.board;
-        currentPlayer = result.currentPlayer;
-        gameOver = false;
-        history = [];
-        moveList = [];
-        selectedRow = -1;
-        selectedCol = -1;
-        refreshMoveList();
-        gameStatusEl.innerText = (currentPlayer === 'red' ? '红' : '黑') + '方走棋';
-        drawBoard();
-        
-        if (currentPlayer === 'black') {
-            aiMakeMove();
-        }
     });
 
     // 游戏内难度选择变化监听器
@@ -4878,6 +5293,7 @@ self.onmessage = function(e) {
         currentHint = null;
         lastAiMove = null;
         movePatterns = [];
+        resetRegretLimitForNewGame();
         
         // 应用设置
         const settings = window.gameSettings || { computeMode: 'gpu' };
@@ -4885,6 +5301,10 @@ self.onmessage = function(e) {
         
         // 更新AI难度显示
         updateAiDifficultyDisplay();
+        
+        // 启用游戏控制按钮
+        enableGameControls();
+        updateRegretButtonText();
         
         drawBoard();
         gameStatusEl.innerText = '红方走棋';
@@ -4915,9 +5335,7 @@ self.onmessage = function(e) {
     window.closeModal = closeModal;
     window.restartGame = restartGame;
     window.applySettingsToGame = applySettingsToGame;
-    window.continueGame = continueGame;
     window.drawGame = drawGame;
-    window.saveCurrentGameToStorage = saveCurrentGameToStorage;
     window.showGameOverModal = showGameOverModal;
     window.closeGameOverModal = closeGameOverModal;
     window.updateAiDifficultyDisplay = updateAiDifficultyDisplay;
@@ -4925,6 +5343,9 @@ self.onmessage = function(e) {
     window.updateSettingsUI = updateSettingsUI;
     window.showDifficultyModal = showDifficultyModal;
     window.selectDifficulty = selectDifficulty;
+    window.detectCheckmateType = detectCheckmateType;
+    window.updateRegretButtonText = updateRegretButtonText;
+    window.playOpeningAnimation = playOpeningAnimation;
 })();
 </script>
 </body>
