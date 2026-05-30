@@ -1239,7 +1239,7 @@
     <div class="settings-container">
         <div class="settings-header">
             <h2>设置</h2>
-            <button class="back-btn" onclick="showMainMenu()">← 返回</button>
+            <button class="back-btn" onclick="showMainMenu(true)">← 返回</button>
         </div>
         
         <div class="settings-content">
@@ -1282,6 +1282,23 @@
                     </select>
                 </div>
                 <div class="setting-item">
+                    <label>启用音效:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="soundEnabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>音效音量:</label>
+                    <select id="soundVolume" class="setting-select">
+                        <option value="0.2">20%</option>
+                        <option value="0.4">40%</option>
+                        <option value="0.6" selected>60%</option>
+                        <option value="0.8">80%</option>
+                        <option value="1">100%</option>
+                    </select>
+                </div>
+                <div class="setting-item">
                     <label>启用FEN保存和导入:</label>
                     <label class="toggle-switch">
                         <input type="checkbox" id="fenEnabled">
@@ -1310,7 +1327,7 @@
         <div class="records-header">
             <h2>记录</h2>
             <div class="records-actions">
-                <button class="back-btn" onclick="showMainMenu()">← 返回</button>
+                <button class="back-btn" onclick="showMainMenu(true)">← 返回</button>
             </div>
         </div>
         
@@ -1467,6 +1484,7 @@ function showModal(title, message, showCancel = false, onConfirm = null) {
 }
 
 function closeModal() {
+    playSfx('click');
     document.getElementById('customModal').style.display = 'none';
     modalConfirmCallback = null;
 }
@@ -1479,6 +1497,14 @@ function showGameOverModal(result, message, checkmateType) {
     const msg = document.getElementById('gameOverMessage');
     const content = document.getElementById('gameOverContent');
     const checkmateEl = document.getElementById('gameOverCheckmate');
+
+    if (result === 'draw') {
+        playSfx('draw');
+    } else if (result === 'red-win') {
+        playSfx('win');
+    } else if (result === 'ai-win' || result === 'black-win') {
+        playSfx('lose');
+    }
     
     // 清除之前的彩纸
     const oldConfetti = modal.querySelectorAll('.confetti');
@@ -1527,6 +1553,7 @@ function showGameOverModal(result, message, checkmateType) {
 }
 
 function closeGameOverModal() {
+    playSfx('click');
     const modal = document.getElementById('gameOverModal');
     modal.classList.remove('show');
     disableGameControls();
@@ -1588,6 +1615,8 @@ let gameSettings = {
     hintEnabled: false,
     regretEnabled: true,
     regretLimit: 'auto',
+    soundEnabled: true,
+    soundVolume: 0.6,
     fenEnabled: false,
     debugMode: false
 };
@@ -1604,19 +1633,24 @@ let gameRecords = {
 function loadSettings() {
     const saved = localStorage.getItem('chessSettings');
     if (saved) {
-        gameSettings = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        gameSettings = { ...gameSettings, ...parsed };
         // 更新全局变量
         computeMode = gameSettings.computeMode;
     }
     updateSettingsUI();
+    updateAudioSettings();
 }
 
 // 保存设置
 function saveSettings() {
+    playSfx('click');
     gameSettings.computeMode = document.getElementById('menuComputeMode').value;
     gameSettings.hintEnabled = document.getElementById('hintEnabled').checked;
     gameSettings.regretEnabled = document.getElementById('regretEnabled').checked;
     gameSettings.regretLimit = document.getElementById('regretLimit').value;
+    gameSettings.soundEnabled = document.getElementById('soundEnabled').checked;
+    gameSettings.soundVolume = parseFloat(document.getElementById('soundVolume').value);
     gameSettings.fenEnabled = document.getElementById('fenEnabled').checked;
     gameSettings.debugMode = document.getElementById('debugMode').checked;
     
@@ -1624,6 +1658,7 @@ function saveSettings() {
     computeMode = gameSettings.computeMode;
     
     localStorage.setItem('chessSettings', JSON.stringify(gameSettings));
+    updateAudioSettings();
     
     // 如果游戏正在进行，更新AI难度显示
     updateAiDifficultyDisplay();
@@ -1637,12 +1672,218 @@ function updateSettingsUI() {
     document.getElementById('hintEnabled').checked = gameSettings.hintEnabled;
     document.getElementById('regretEnabled').checked = gameSettings.regretEnabled;
     document.getElementById('regretLimit').value = gameSettings.regretLimit || 'auto';
+    document.getElementById('soundEnabled').checked = gameSettings.soundEnabled !== false;
+    document.getElementById('soundVolume').value = String(gameSettings.soundVolume ?? 0.6);
     document.getElementById('fenEnabled').checked = gameSettings.fenEnabled;
     document.getElementById('debugMode').checked = gameSettings.debugMode || false;
 }
 
+let audioContext = null;
+let audioMaster = null;
+let audioFxBus = null;
+let audioFxDelay = null;
+let audioFxFeedback = null;
+let audioCompressor = null;
+let noiseBuffer = null;
+
+function updateAudioSettings() {
+    if (!audioMaster) return;
+    const enabled = gameSettings.soundEnabled !== false;
+    const vol = Number(gameSettings.soundVolume ?? 0.6);
+    const clamped = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 0.6;
+    audioMaster.gain.value = enabled ? clamped * 0.65 : 0;
+    if (audioFxBus) {
+        audioFxBus.gain.value = enabled ? clamped * 0.35 : 0;
+    }
+}
+
+function ensureAudioReady() {
+    if (!gameSettings.soundEnabled) return false;
+    if (audioContext) return true;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    audioContext = new Ctx();
+    audioCompressor = audioContext.createDynamicsCompressor();
+    audioCompressor.threshold.value = -18;
+    audioCompressor.knee.value = 24;
+    audioCompressor.ratio.value = 6;
+    audioCompressor.attack.value = 0.003;
+    audioCompressor.release.value = 0.12;
+    
+    audioMaster = audioContext.createGain();
+    
+    audioFxBus = audioContext.createGain();
+    audioFxBus.gain.value = 0.35;
+    
+    audioFxDelay = audioContext.createDelay(1.0);
+    audioFxDelay.delayTime.value = 0.085;
+    audioFxFeedback = audioContext.createGain();
+    audioFxFeedback.gain.value = 0.22;
+    const fxFilter = audioContext.createBiquadFilter();
+    fxFilter.type = 'lowpass';
+    fxFilter.frequency.value = 2600;
+    fxFilter.Q.value = 0.7;
+    
+    audioFxBus.connect(audioFxDelay);
+    audioFxDelay.connect(fxFilter);
+    fxFilter.connect(audioFxFeedback);
+    audioFxFeedback.connect(audioFxDelay);
+    fxFilter.connect(audioCompressor);
+    
+    audioMaster.connect(audioCompressor);
+    audioCompressor.connect(audioContext.destination);
+    updateAudioSettings();
+    return true;
+}
+
+function getNoiseBuffer() {
+    if (!audioContext) return null;
+    if (noiseBuffer) return noiseBuffer;
+    const ctx = audioContext;
+    const seconds = 1.0;
+    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1);
+    }
+    noiseBuffer = buffer;
+    return noiseBuffer;
+}
+
+function scheduleGainEnvelope(g, t0, peak, tAttack, tRelease) {
+    const safePeak = Math.max(0.0001, Math.min(1, peak));
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(safePeak, t0 + tAttack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + tAttack + tRelease);
+}
+
+function playTone(freq, durationMs, type, gain, at, toFx) {
+    if (!ensureAudioReady()) return;
+    const ctx = audioContext;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    g.gain.value = 0;
+    osc.connect(g);
+    g.connect(toFx ? audioFxBus : audioMaster);
+
+    const now = ctx.currentTime;
+    const t0 = now + (at || 0);
+    const duration = durationMs / 1000;
+    scheduleGainEnvelope(g, t0, gain || 0.18, 0.004, Math.max(0.02, duration));
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.03);
+}
+
+function playNoise(durationMs, band, q, gain, at, toFx) {
+    if (!ensureAudioReady()) return;
+    const ctx = audioContext;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
+    const buf = getNoiseBuffer();
+    if (!buf) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = band;
+    filter.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(toFx ? audioFxBus : audioMaster);
+    const now = ctx.currentTime;
+    const t0 = now + (at || 0);
+    const duration = durationMs / 1000;
+    scheduleGainEnvelope(g, t0, gain, 0.002, Math.max(0.02, duration));
+    src.start(t0);
+    src.stop(t0 + duration + 0.03);
+}
+
+function playUiClick() {
+    playNoise(32, 3200, 0.9, 0.10, 0, true);
+    playTone(1100, 22, 'sine', 0.06, 0.0, true);
+}
+
+function playMoveThump() {
+    playNoise(55, 220, 0.7, 0.13, 0.0, false);
+    playTone(180, 70, 'sine', 0.09, 0.0, false);
+}
+
+function playCaptureHit() {
+    playNoise(70, 1600, 1.2, 0.14, 0.0, true);
+    playNoise(55, 260, 0.8, 0.12, 0.0, false);
+    playTone(520, 40, 'sine', 0.06, 0.01, true);
+}
+
+function playCheckAlert() {
+    playTone(880, 60, 'sine', 0.08, 0.0, true);
+    playTone(880, 60, 'sine', 0.08, 0.085, true);
+    playTone(988, 90, 'sine', 0.10, 0.17, true);
+}
+
+function playSfx(name) {
+    if (!gameSettings.soundEnabled) return;
+    if (!ensureAudioReady()) return;
+    updateAudioSettings();
+
+    if (name === 'click') {
+        playUiClick();
+        return;
+    }
+    if (name === 'move') {
+        playMoveThump();
+        return;
+    }
+    if (name === 'capture') {
+        playCaptureHit();
+        return;
+    }
+    if (name === 'check') {
+        playCheckAlert();
+        return;
+    }
+    if (name === 'start') {
+        playTone(523.25, 110, 'sine', 0.08, 0.0, true);
+        playTone(659.25, 110, 'sine', 0.08, 0.12, true);
+        playTone(783.99, 150, 'sine', 0.10, 0.24, true);
+        playNoise(80, 4200, 0.8, 0.05, 0.26, true);
+        return;
+    }
+    if (name === 'win') {
+        playTone(523.25, 120, 'sine', 0.08, 0.0, true);
+        playTone(659.25, 120, 'sine', 0.08, 0.12, true);
+        playTone(783.99, 140, 'sine', 0.09, 0.24, true);
+        playTone(1046.5, 190, 'sine', 0.10, 0.38, true);
+        playNoise(140, 5200, 0.7, 0.06, 0.40, true);
+        return;
+    }
+    if (name === 'lose') {
+        playTone(392.0, 150, 'sine', 0.09, 0.0, true);
+        playTone(329.63, 150, 'sine', 0.09, 0.17, true);
+        playTone(261.63, 230, 'sine', 0.11, 0.34, true);
+        playNoise(160, 900, 0.8, 0.05, 0.34, true);
+        return;
+    }
+    if (name === 'draw') {
+        playTone(440, 120, 'sine', 0.08, 0.0, true);
+        playTone(440, 120, 'sine', 0.08, 0.16, true);
+        playNoise(90, 2400, 0.7, 0.04, 0.0, true);
+    }
+}
+
 // 界面切换函数
-function showMainMenu() {
+function showMainMenu(playSound = false) {
+    if (playSound) playSfx('click');
     document.getElementById('mainMenu').style.display = 'flex';
     document.getElementById('settingsMenu').style.display = 'none';
     document.getElementById('recordsMenu').style.display = 'none';
@@ -1675,6 +1916,7 @@ function showMainMenu() {
 }
 
 function showSettings() {
+    playSfx('click');
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('settingsMenu').style.display = 'flex';
     document.getElementById('recordsMenu').style.display = 'none';
@@ -1683,6 +1925,7 @@ function showSettings() {
 }
 
 function showGameRecords() {
+    playSfx('click');
     document.getElementById('mainMenu').style.display = 'none';
     document.getElementById('settingsMenu').style.display = 'none';
     document.getElementById('recordsMenu').style.display = 'flex';
@@ -1692,6 +1935,7 @@ function showGameRecords() {
 
 // 开始游戏函数
 function startGame() {
+    playSfx('click');
     // 检查是否有未完成的对局
     const savedGame = localStorage.getItem('currentGame');
     if (savedGame) {
@@ -1726,6 +1970,7 @@ function showDifficultyModal() {
 function selectDifficulty(difficulty) {
     const modal = document.getElementById('difficultyModal');
     modal.classList.remove('show');
+    playSfx('start');
     
     // 设置当前对局的AI难度
     window.currentGameDifficulty = difficulty;
@@ -1970,7 +2215,7 @@ function saveGameRecords() {
     }
 
     function getConfiguredRegretLimit(difficulty) {
-        const settings = window.gameSettings || {};
+        const settings = gameSettings;
         const v = settings.regretLimit ?? 'auto';
         if (v === 'auto') return getDefaultRegretLimitByDifficulty(difficulty);
         const n = parseInt(v, 10);
@@ -1981,7 +2226,7 @@ function saveGameRecords() {
     function updateRegretButtonText() {
         const btn = document.getElementById('regretBtn');
         if (!btn) return;
-        const settings = window.gameSettings || {};
+        const settings = gameSettings;
         if (!settings.regretEnabled) return;
         const remainText = regretRemaining === Infinity ? '∞' : String(regretRemaining);
         btn.textContent = `↩️ 悔棋 (${remainText})`;
@@ -1989,7 +2234,7 @@ function saveGameRecords() {
     }
 
     function resetRegretLimitForNewGame() {
-        const settings = window.gameSettings || {};
+        const settings = gameSettings;
         if (!settings.regretEnabled) {
             regretRemaining = 0;
             updateRegretButtonText();
@@ -2268,6 +2513,7 @@ function isInCheck(board, color) {
             }
         }
     }
+    if (kingRow === undefined || kingCol === undefined) return false;
     for (let r=0; r<ROWS; r++) {
         for (let c=0; c<COLS; c++) {
             const piece = board[r][c];
@@ -2281,38 +2527,185 @@ function isInCheck(board, color) {
     return false;
 }
 
-function moveWouldLeaveSelfInCheck(board, fromRow, fromCol, toRow, toCol, color) {
-    const newBoard = copyBoard(board);
-    const piece = newBoard[fromRow][fromCol];
-    newBoard[fromRow][fromCol] = EMPTY;
-    newBoard[toRow][toCol] = piece;
-    return isInCheck(newBoard, color) || kingsFacing(newBoard);
+function isSquareAttacked(board, row, col, attackerColor) {
+    for (let r=0; r<ROWS; r++) {
+        for (let c=0; c<COLS; c++) {
+            const piece = board[r][c];
+            if (!piece) continue;
+            if (getPieceColor(piece) !== attackerColor) continue;
+            if (isValidAttack(board, piece, r, c, row, col)) return true;
+        }
+    }
+    return false;
+}
+
+function makeMove(board, move) {
+    const piece = board[move.fromRow][move.fromCol];
+    const captured = board[move.toRow][move.toCol];
+    board[move.fromRow][move.fromCol] = EMPTY;
+    board[move.toRow][move.toCol] = piece;
+    return captured;
+}
+
+function unmakeMove(board, move, captured) {
+    board[move.fromRow][move.fromCol] = move.piece;
+    board[move.toRow][move.toCol] = captured;
+}
+
+function moveLeavesSelfInCheck(board, move, color) {
+    const captured = makeMove(board, move);
+    const bad = isInCheck(board, color) || kingsFacing(board);
+    unmakeMove(board, move, captured);
+    return bad;
+}
+
+function inPalace(color, row, col) {
+    if (col < 3 || col > 5) return false;
+    if (color === 'red') return row >= 7 && row <= 9;
+    return row >= 0 && row <= 2;
+}
+
+function generatePseudoMovesForPiece(board, fromRow, fromCol, piece, outMoves) {
+    const color = getPieceColor(piece);
+    const p = piece.toLowerCase();
+
+    function push(toRow, toCol) {
+        if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) return;
+        const target = board[toRow][toCol];
+        if (target && sameColor(piece, target)) return;
+        outMoves.push({ fromRow, fromCol, toRow, toCol, piece });
+    }
+
+    if (p === 'r') {
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        for (let i=0; i<dirs.length; i++) {
+            const dr = dirs[i][0], dc = dirs[i][1];
+            let r = fromRow + dr, c = fromCol + dc;
+            while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                const target = board[r][c];
+                if (!target) {
+                    push(r, c);
+                } else {
+                    if (!sameColor(piece, target)) push(r, c);
+                    break;
+                }
+                r += dr; c += dc;
+            }
+        }
+        return;
+    }
+
+    if (p === 'c') {
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        for (let i=0; i<dirs.length; i++) {
+            const dr = dirs[i][0], dc = dirs[i][1];
+            let r = fromRow + dr, c = fromCol + dc;
+            while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === EMPTY) {
+                push(r, c);
+                r += dr; c += dc;
+            }
+            while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === EMPTY) {
+                r += dr; c += dc;
+            }
+            r += dr; c += dc;
+            while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                const target = board[r][c];
+                if (target !== EMPTY) {
+                    if (!sameColor(piece, target)) push(r, c);
+                    break;
+                }
+                r += dr; c += dc;
+            }
+        }
+        return;
+    }
+
+    if (p === 'n') {
+        const candidates = [
+            [-2,-1,-1,0],[-2,1,-1,0], [2,-1,1,0],[2,1,1,0],
+            [-1,-2,0,-1],[1,-2,0,-1], [-1,2,0,1],[1,2,0,1]
+        ];
+        for (let i=0; i<candidates.length; i++) {
+            const dr = candidates[i][0], dc = candidates[i][1];
+            const lr = candidates[i][2], lc = candidates[i][3];
+            const legRow = fromRow + lr, legCol = fromCol + lc;
+            if (legRow < 0 || legRow >= ROWS || legCol < 0 || legCol >= COLS) continue;
+            if (board[legRow][legCol] !== EMPTY) continue;
+            push(fromRow + dr, fromCol + dc);
+        }
+        return;
+    }
+
+    if (p === 'b') {
+        const dirs = [[-2,-2],[-2,2],[2,-2],[2,2]];
+        for (let i=0; i<dirs.length; i++) {
+            const dr = dirs[i][0], dc = dirs[i][1];
+            const eyeRow = fromRow + dr/2, eyeCol = fromCol + dc/2;
+            const toRow = fromRow + dr, toCol = fromCol + dc;
+            if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) continue;
+            if (board[eyeRow][eyeCol] !== EMPTY) continue;
+            if (color === 'red' && toRow < 5) continue;
+            if (color === 'black' && toRow > 4) continue;
+            push(toRow, toCol);
+        }
+        return;
+    }
+
+    if (p === 'a') {
+        const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+        for (let i=0; i<dirs.length; i++) {
+            const toRow = fromRow + dirs[i][0], toCol = fromCol + dirs[i][1];
+            if (!inPalace(color, toRow, toCol)) continue;
+            push(toRow, toCol);
+        }
+        return;
+    }
+
+    if (p === 'k') {
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        for (let i=0; i<dirs.length; i++) {
+            const toRow = fromRow + dirs[i][0], toCol = fromCol + dirs[i][1];
+            if (!inPalace(color, toRow, toCol)) continue;
+            push(toRow, toCol);
+        }
+        return;
+    }
+
+    if (p === 'p') {
+        if (color === 'red') {
+            push(fromRow - 1, fromCol);
+            if (fromRow <= 4) {
+                push(fromRow, fromCol - 1);
+                push(fromRow, fromCol + 1);
+            }
+        } else {
+            push(fromRow + 1, fromCol);
+            if (fromRow >= 5) {
+                push(fromRow, fromCol - 1);
+                push(fromRow, fromCol + 1);
+            }
+        }
+        return;
+    }
 }
 
 function getAllLegalMoves(board, color) {
-    let moves = [];
+    const pseudo = [];
     for (let r=0; r<ROWS; r++) {
         for (let c=0; c<COLS; c++) {
             const piece = board[r][c];
             if (!piece) continue;
             if (getPieceColor(piece) !== color) continue;
-            for (let tr=0; tr<ROWS; tr++) {
-                for (let tc=0; tc<COLS; tc++) {
-                    if (r===tr && c===tc) continue;
-                    const target = board[tr][tc];
-                    if (target && sameColor(piece, target)) continue;
-                    if (!isValidAttack(board, piece, r, c, tr, tc)) continue;
-                    if (moveWouldLeaveSelfInCheck(board, r, c, tr, tc, color)) continue;
-                    moves.push({
-                        fromRow: r, fromCol: c,
-                        toRow: tr, toCol: tc,
-                        piece: piece
-                    });
-                }
-            }
+            generatePseudoMovesForPiece(board, r, c, piece, pseudo);
         }
     }
-    return moves;
+
+    const legal = [];
+    for (let i=0; i<pseudo.length; i++) {
+        const m = pseudo[i];
+        if (!moveLeavesSelfInCheck(board, m, color)) legal.push(m);
+    }
+    return legal;
 }
 
 const pieceValues = {
@@ -2351,8 +2744,54 @@ function buildMobilityMap(moves) {
     return map;
 }
 
-function buildAttackMap(board, attackerColor) {
-    const attack = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+function canCaptureAssumingEnemy(board, piece, fromRow, fromCol, toRow, toCol) {
+    if (fromRow === toRow && fromCol === toCol) return false;
+    const p = piece.toLowerCase();
+    if (p === 'c') {
+        if (fromRow !== toRow && fromCol !== toCol) return false;
+        const deltaRow = toRow - fromRow;
+        const deltaCol = toCol - fromCol;
+        const stepRow = deltaRow === 0 ? 0 : (deltaRow > 0 ? 1 : -1);
+        const stepCol = deltaCol === 0 ? 0 : (deltaCol > 0 ? 1 : -1);
+        let cnt = 0;
+        let r = fromRow + stepRow, c = fromCol + stepCol;
+        while (r !== toRow || c !== toCol) {
+            if (board[r][c] !== EMPTY) cnt++;
+            r += stepRow; c += stepCol;
+        }
+        return cnt === 1;
+    }
+    const saved = board[toRow][toCol];
+    board[toRow][toCol] = EMPTY;
+    const ok = isValidAttack(board, piece, fromRow, fromCol, toRow, toCol);
+    board[toRow][toCol] = saved;
+    return ok;
+}
+
+function buildCaptureMap(board, attackerColor) {
+    const cap = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const piece = board[r][c];
+            if (!piece) continue;
+            if (getPieceColor(piece) !== attackerColor) continue;
+            for (let tr = 0; tr < ROWS; tr++) {
+                for (let tc = 0; tc < COLS; tc++) {
+                    const target = board[tr][tc];
+                    if (!target) continue;
+                    if (sameColor(piece, target)) continue;
+                    if (isValidAttack(board, piece, r, c, tr, tc)) {
+                        cap[tr][tc] = true;
+                    }
+                }
+            }
+        }
+    }
+    return cap;
+}
+
+function buildPressureMap(board, attackerColor) {
+    const press = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             const piece = board[r][c];
@@ -2361,62 +2800,194 @@ function buildAttackMap(board, attackerColor) {
             for (let tr = 0; tr < ROWS; tr++) {
                 for (let tc = 0; tc < COLS; tc++) {
                     if (r === tr && c === tc) continue;
-                    const target = board[tr][tc];
-                    if (target && sameColor(piece, target)) continue;
-                    if (isValidAttack(board, piece, r, c, tr, tc)) {
-                        attack[tr][tc] = true;
+                    if (canCaptureAssumingEnemy(board, piece, r, c, tr, tc)) {
+                        press[tr][tc] = true;
                     }
                 }
             }
         }
     }
-    return attack;
+    return press;
 }
 
 function evaluateBoard(b) {
     let score = 0;
 
-    const redMoves = getAllLegalMoves(b, 'red');
-    const blackMoves = getAllLegalMoves(b, 'black');
-    const redMob = buildMobilityMap(redMoves);
-    const blackMob = buildMobilityMap(blackMoves);
+    function buildInfluenceMap(board, color) {
+        const inf = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+        function mark(r, c) {
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+            inf[r][c] = true;
+        }
+        for (let r=0; r<ROWS; r++) {
+            for (let c=0; c<COLS; c++) {
+                const piece = board[r][c];
+                if (!piece) continue;
+                if (getPieceColor(piece) !== color) continue;
+                const p = piece.toLowerCase();
 
-    const redAtk = buildAttackMap(b, 'red');
-    const blackAtk = buildAttackMap(b, 'black');
+                if (p === 'r') {
+                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                    for (let i=0; i<dirs.length; i++) {
+                        const dr = dirs[i][0], dc = dirs[i][1];
+                        let rr = r + dr, cc = c + dc;
+                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+                            mark(rr, cc);
+                            if (board[rr][cc] !== EMPTY) break;
+                            rr += dr; cc += dc;
+                        }
+                    }
+                    continue;
+                }
+
+                if (p === 'c') {
+                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                    for (let i=0; i<dirs.length; i++) {
+                        const dr = dirs[i][0], dc = dirs[i][1];
+                        let rr = r + dr, cc = c + dc;
+                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && board[rr][cc] === EMPTY) {
+                            rr += dr; cc += dc;
+                        }
+                        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+                        rr += dr; cc += dc;
+                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+                            if (board[rr][cc] !== EMPTY) {
+                                mark(rr, cc);
+                                break;
+                            }
+                            rr += dr; cc += dc;
+                        }
+                    }
+                    continue;
+                }
+
+                if (p === 'n') {
+                    const candidates = [
+                        [-2,-1,-1,0],[-2,1,-1,0], [2,-1,1,0],[2,1,1,0],
+                        [-1,-2,0,-1],[1,-2,0,-1], [-1,2,0,1],[1,2,0,1]
+                    ];
+                    for (let i=0; i<candidates.length; i++) {
+                        const dr = candidates[i][0], dc = candidates[i][1];
+                        const lr = candidates[i][2], lc = candidates[i][3];
+                        const legRow = r + lr, legCol = c + lc;
+                        if (legRow < 0 || legRow >= ROWS || legCol < 0 || legCol >= COLS) continue;
+                        if (board[legRow][legCol] !== EMPTY) continue;
+                        mark(r + dr, c + dc);
+                    }
+                    continue;
+                }
+
+                if (p === 'b') {
+                    const dirs = [[-2,-2],[-2,2],[2,-2],[2,2]];
+                    for (let i=0; i<dirs.length; i++) {
+                        const dr = dirs[i][0], dc = dirs[i][1];
+                        const eyeRow = r + dr/2, eyeCol = c + dc/2;
+                        const toRow = r + dr, toCol = c + dc;
+                        if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) continue;
+                        if (board[eyeRow][eyeCol] !== EMPTY) continue;
+                        if (color === 'red' && toRow < 5) continue;
+                        if (color === 'black' && toRow > 4) continue;
+                        mark(toRow, toCol);
+                    }
+                    continue;
+                }
+
+                if (p === 'a') {
+                    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+                    for (let i=0; i<dirs.length; i++) {
+                        const toRow = r + dirs[i][0], toCol = c + dirs[i][1];
+                        if (!inPalace(color, toRow, toCol)) continue;
+                        mark(toRow, toCol);
+                    }
+                    continue;
+                }
+
+                if (p === 'k') {
+                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                    for (let i=0; i<dirs.length; i++) {
+                        const toRow = r + dirs[i][0], toCol = c + dirs[i][1];
+                        if (!inPalace(color, toRow, toCol)) continue;
+                        mark(toRow, toCol);
+                    }
+                    continue;
+                }
+
+                if (p === 'p') {
+                    if (color === 'red') {
+                        mark(r - 1, c);
+                        if (r <= 4) { mark(r, c - 1); mark(r, c + 1); }
+                    } else {
+                        mark(r + 1, c);
+                        if (r >= 5) { mark(r, c - 1); mark(r, c + 1); }
+                    }
+                }
+            }
+        }
+        return inf;
+    }
+
+    const redInf = buildInfluenceMap(b, 'red');
+    const blackInf = buildInfluenceMap(b, 'black');
+
+    let redKing, blackKing;
+    for (let r=0; r<ROWS; r++) {
+        for (let c=0; c<COLS; c++) {
+            const p = b[r][c];
+            if (p === 'K') redKing = [r,c];
+            if (p === 'k') blackKing = [r,c];
+        }
+    }
+
+    function mobilityCountForPiece(board, r, c, piece) {
+        const tmp = [];
+        generatePseudoMovesForPiece(board, r, c, piece, tmp);
+        return tmp.length;
+    }
 
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             const p = b[r][c];
             if (!p) continue;
-
             const color = getPieceColor(p);
             const base = pieceValues[p] || 0;
             let val = base + getPosBonus(p, r, c);
-            val += (color === 'red' ? redMob[r][c] : blackMob[r][c]) * 3;
+            val += mobilityCountForPiece(b, r, c, p) * 2;
 
-            const attacked = (color === 'red') ? blackAtk[r][c] : redAtk[r][c];
-            const defended = (color === 'red') ? redAtk[r][c] : blackAtk[r][c];
-            if (attacked) {
-                val -= defended ? base * 0.12 : base * 0.28;
-            }
+            const attacked = color === 'red' ? blackInf[r][c] : redInf[r][c];
+            const defended = color === 'red' ? redInf[r][c] : blackInf[r][c];
+            if (attacked) val -= defended ? base * 0.16 : base * 0.38;
+            if (defended && !attacked) val += base * 0.03;
 
             score += (color === 'red') ? val : -val;
         }
     }
 
-    score += (redMoves.length - blackMoves.length) * 2;
-
-    if (isInCheck(b, 'red')) score -= 220;
-    if (isInCheck(b, 'black')) score += 260;
-
-    if (isCheckmate(b, 'red')) score -= 50000;
-    if (isCheckmate(b, 'black')) score += 50000;
-
-    if (aiStrategy === 'aggressive') {
-        score *= 1.15;
-    } else if (aiStrategy === 'defensive') {
-        score *= 0.9;
+    if (redKing) {
+        const kr = redKing[0], kc = redKing[1];
+        let danger = 0;
+        for (let r = Math.max(0, kr - 1); r <= Math.min(ROWS - 1, kr + 1); r++) {
+            for (let c = Math.max(0, kc - 1); c <= Math.min(COLS - 1, kc + 1); c++) {
+                if (blackInf[r][c] && inPalace('red', r, c)) danger++;
+            }
+        }
+        score -= danger * 60;
     }
+    if (blackKing) {
+        const kr = blackKing[0], kc = blackKing[1];
+        let danger = 0;
+        for (let r = Math.max(0, kr - 1); r <= Math.min(ROWS - 1, kr + 1); r++) {
+            for (let c = Math.max(0, kc - 1); c <= Math.min(COLS - 1, kc + 1); c++) {
+                if (redInf[r][c] && inPalace('black', r, c)) danger++;
+            }
+        }
+        score += danger * 70;
+    }
+
+    if (isInCheck(b, 'red')) score -= 260;
+    if (isInCheck(b, 'black')) score += 300;
+
+    if (aiStrategy === 'aggressive') score *= 1.08;
+    else if (aiStrategy === 'defensive') score *= 0.93;
 
     return score;
 }
@@ -2426,7 +2997,12 @@ function isCheckmate(board, color) {
     return moves.length === 0;
 }
 
+let searchDeadline = 0;
+
 function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
+    if (searchDeadline && Date.now() >= searchDeadline) {
+        return evaluateBoard(b);
+    }
     const standPat = evaluateBoard(b);
     
     if (isMaximizing) {
@@ -2449,11 +3025,10 @@ function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
         for (let move of captureMoves) {
             const capturedValue = pieceValues[b[move.toRow][move.toCol]] || 0;
             if (standPat + capturedValue + 200 < alpha) continue;
-            
-            const newB = copyBoard(b);
-            newB[move.fromRow][move.fromCol] = EMPTY;
-            newB[move.toRow][move.toCol] = move.piece;
-            const score = quiescenceSearch(newB, alpha, beta, false, depth - 1);
+
+            const captured = makeMove(b, move);
+            const score = quiescenceSearch(b, alpha, beta, false, depth - 1);
+            unmakeMove(b, move, captured);
             if (score >= beta) return beta;
             if (score > alpha) alpha = score;
         }
@@ -2462,11 +3037,10 @@ function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
         for (let move of captureMoves) {
             const capturedValue = pieceValues[b[move.toRow][move.toCol]] || 0;
             if (standPat - capturedValue - 200 > beta) continue;
-            
-            const newB = copyBoard(b);
-            newB[move.fromRow][move.fromCol] = EMPTY;
-            newB[move.toRow][move.toCol] = move.piece;
-            const score = quiescenceSearch(newB, alpha, beta, true, depth - 1);
+
+            const captured = makeMove(b, move);
+            const score = quiescenceSearch(b, alpha, beta, true, depth - 1);
+            unmakeMove(b, move, captured);
             if (score <= alpha) return alpha;
             if (score < beta) beta = score;
         }
@@ -2492,10 +3066,19 @@ function scoreMoveForOrdering(board, move, moverColor) {
     score += getPosBonus(move.piece, move.toRow, move.toCol) - getPosBonus(move.piece, move.fromRow, move.fromCol);
     const opponent = moverColor === 'red' ? 'black' : 'red';
     score += withTemporaryMove(board, move, () => isInCheck(board, opponent) ? 50000 : 0);
+    score += withTemporaryMove(board, move, () => {
+        if (isSquareAttacked(board, move.toRow, move.toCol, opponent)) {
+            return -(pieceValues[move.piece] || 0) * 18;
+        }
+        return 0;
+    });
     return score;
 }
 
 function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
+    if (searchDeadline && Date.now() >= searchDeadline) {
+        return evaluateBoard(b);
+    }
     if (depth === 0) {
         return quiescenceSearch(b, alpha, beta, isMaximizing, 8);
     }
@@ -2517,10 +3100,9 @@ function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
     if (isMaximizing) {
         let maxEval = -Infinity;
         for (let move of moves) {
-            const newB = copyBoard(b);
-            newB[move.fromRow][move.fromCol] = EMPTY;
-            newB[move.toRow][move.toCol] = move.piece;
-            const evalScore = minimax(newB, depth - 1, alpha, beta, false, maxDepth);
+            const captured = makeMove(b, move);
+            const evalScore = minimax(b, depth - 1, alpha, beta, false, maxDepth);
+            unmakeMove(b, move, captured);
             maxEval = Math.max(maxEval, evalScore);
             alpha = Math.max(alpha, evalScore);
             if (beta <= alpha) break;
@@ -2529,10 +3111,9 @@ function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
     } else {
         let minEval = Infinity;
         for (let move of moves) {
-            const newB = copyBoard(b);
-            newB[move.fromRow][move.fromCol] = EMPTY;
-            newB[move.toRow][move.toCol] = move.piece;
-            const evalScore = minimax(newB, depth - 1, alpha, beta, true, maxDepth);
+            const captured = makeMove(b, move);
+            const evalScore = minimax(b, depth - 1, alpha, beta, true, maxDepth);
+            unmakeMove(b, move, captured);
             minEval = Math.min(minEval, evalScore);
             beta = Math.min(beta, evalScore);
             if (beta <= alpha) break;
@@ -2560,88 +3141,88 @@ self.onmessage = function(e) {
     
     const { board, difficulty, moveList, computeMode, isHint, debugMode } = e.data;
     
-    // GPU优化：如果浏览器支持WebGPU，尝试使用GPU加速
     let useGPU = false;
     if (computeMode === 'gpu' && typeof navigator !== 'undefined' && navigator.gpu) {
         useGPU = true;
     }
-    
-    // 根据难度设置搜索深度
-    const searchDepth = useGPU ? 
-        Math.max(1, difficulty === 0 ? 1 : (difficulty === 1 ? 2 : (difficulty === 2 ? 3 : (difficulty === 3 ? 4 : (difficulty === 4 ? 5 : 6))))) :
-        (difficulty === 0 ? 1 : (difficulty === 1 ? 3 : (difficulty === 2 ? 5 : (difficulty === 3 ? 7 : (difficulty === 4 ? 9 : 11)))));
-    
-    let moves = isHint ? getAllLegalMoves(board, 'red') : getAllLegalMoves(board, 'black');
-    
+
+    const moverColor = isHint ? 'red' : 'black';
+    let moves = getAllLegalMoves(board, moverColor);
     if (moves.length === 0) {
         self.postMessage({ move: null, gameOver: true });
         return;
     }
-    
-    let selectedMove = null;
-    
-    if (difficulty === 0) {
-        let captureMoves = moves.filter(m => board[m.toRow][m.toCol] !== EMPTY);
-        if (captureMoves.length > 0) {
-            captureMoves.sort((a, b) => (pieceValues[board[b.toRow][b.toCol]] || 0) - (pieceValues[board[a.toRow][a.toCol]] || 0));
-            selectedMove = captureMoves[0];
-        } else {
-            selectedMove = moves[Math.floor(Math.random() * moves.length)];
-        }
-    } else {
-        let bestScore = isHint ? -Infinity : Infinity;
-        let bestMoves = [];
-        
-        moves.sort((a, b) => {
-            let scoreA = 0, scoreB = 0;
-            if (board[a.toRow][a.toCol]) scoreA += pieceValues[board[a.toRow][a.toCol]] || 0;
-            if (board[b.toRow][b.toCol]) scoreB += pieceValues[board[b.toRow][b.toCol]] || 0;
-            return scoreB - scoreA;
-        });
+
+    const maxDepthByDifficulty = [3, 4, 5, 6, 7, 8];
+    const baseTimeMsByDifficulty = [220, 420, 700, 1100, 1600, 2300];
+    const maxDepth = maxDepthByDifficulty[Math.max(0, Math.min(5, difficulty))];
+    const timeMs = baseTimeMsByDifficulty[Math.max(0, Math.min(5, difficulty))] * (isHint ? 0.7 : 1);
+
+    searchDeadline = Date.now() + timeMs;
+
+    const scored = new Array(moves.length);
+    for (let i = 0; i < moves.length; i++) {
+        scored[i] = { move: moves[i], score: scoreMoveForOrdering(board, moves[i], moverColor) };
+    }
+    scored.sort((a, bb) => bb.score - a.score);
+    moves = scored.map(x => x.move);
+
+    function sameMove(a, b) {
+        return a && b &&
+            a.fromRow === b.fromRow && a.fromCol === b.fromCol &&
+            a.toRow === b.toRow && a.toCol === b.toCol &&
+            a.piece === b.piece;
+    }
+
+    const chooseBetter = (score, bestScore) => isHint ? (score > bestScore) : (score < bestScore);
+    let bestMoveSoFar = moves[0];
+    let bestScoreSoFar = isHint ? -Infinity : Infinity;
+
+    for (let depth = 1; depth <= maxDepth; depth++) {
+        if (Date.now() >= searchDeadline) break;
+        let depthBestScore = isHint ? -Infinity : Infinity;
+        let depthBestMoves = [];
 
         for (let i = 0; i < moves.length; i++) {
+            if (Date.now() >= searchDeadline) break;
             const move = moves[i];
-            
-            // 发送调试信息
-            if (debugMode) {
+
+            if (debugMode && depth === maxDepth) {
                 self.postMessage({
                     type: 'debug',
                     move: move,
-                    depth: searchDepth,
+                    depth: depth,
                     moveIndex: i,
                     totalMoves: moves.length
                 });
             }
-            
-            const newBoard = copyBoard(board);
-            newBoard[move.fromRow][move.fromCol] = EMPTY;
-            newBoard[move.toRow][move.toCol] = move.piece;
-            
-            const score = minimax(newBoard, searchDepth - 1, -Infinity, Infinity, !isHint, searchDepth, debugMode);
-            
-            if (isHint) {
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMoves = [move];
-                } else if (score === bestScore) {
-                    bestMoves.push(move);
-                }
-            } else {
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestMoves = [move];
-                } else if (score === bestScore) {
-                    bestMoves.push(move);
-                }
+
+            const captured = makeMove(board, move);
+            const score = minimax(board, depth - 1, -Infinity, Infinity, !isHint, depth);
+            unmakeMove(board, move, captured);
+
+            if (chooseBetter(score, depthBestScore)) {
+                depthBestScore = score;
+                depthBestMoves = [move];
+            } else if (score === depthBestScore) {
+                depthBestMoves.push(move);
             }
         }
-        
-        selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+
+        if (depthBestMoves.length > 0) {
+            bestScoreSoFar = depthBestScore;
+            if (difficulty === 0) {
+                const pick = Math.min(3, depthBestMoves.length);
+                bestMoveSoFar = depthBestMoves[Math.floor(Math.random() * pick)];
+            } else {
+                bestMoveSoFar = depthBestMoves[Math.floor(Math.random() * depthBestMoves.length)];
+            }
+            moves = [bestMoveSoFar, ...moves.filter(m => !sameMove(m, bestMoveSoFar))];
+        }
     }
-    
-    if (!selectedMove) selectedMove = moves[0];
-    
-    self.postMessage({ move: selectedMove, gameOver: false, useGPU: useGPU });
+
+    searchDeadline = 0;
+    self.postMessage({ move: bestMoveSoFar, gameOver: false, useGPU: useGPU, bestScore: bestScoreSoFar });
 };
 `;
 
@@ -2866,7 +3447,7 @@ self.onmessage = function(e) {
             showModal('提示', '请在您的回合点击悔棋');
             return false;
         }
-        const settings = window.gameSettings || {};
+        const settings = gameSettings;
         if (!settings.regretEnabled) {
             showModal('提示', '当前已关闭悔棋功能');
             return false;
@@ -3487,6 +4068,10 @@ self.onmessage = function(e) {
 
         // 播放移动动画
         animateMove(fromRow, fromCol, toRow, toCol, piece, () => {
+            playSfx(capturedPiece ? 'capture' : 'move');
+            if (isInCheck(board, 'black')) {
+                playSfx('check');
+            }
             // 在棋盘更新后保存历史记录
             pushHistory(move, notation, capturedPiece);
             
@@ -4594,6 +5179,10 @@ self.onmessage = function(e) {
             
             // 播放移动动画
             animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
+                playSfx(capturedPiece ? 'capture' : 'move');
+                if (isInCheck(board, 'red')) {
+                    playSfx('check');
+                }
                 // 在棋盘更新后保存历史记录
                 pushHistory(move, notation, capturedPiece);
                 
@@ -4633,6 +5222,10 @@ self.onmessage = function(e) {
                     lastAiMove = { ...move };
                     
                     animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
+                        playSfx(capturedPiece ? 'capture' : 'move');
+                        if (isInCheck(board, 'red')) {
+                            playSfx('check');
+                        }
                         // 在棋盘更新后保存历史记录
                         pushHistory(move, notation, capturedPiece);
                         
@@ -5116,20 +5709,24 @@ self.onmessage = function(e) {
     const loadFenBtn = document.getElementById('loadFenBtn');
 
     regretBtn.addEventListener('click', () => {
+        playSfx('click');
         regretMove();
     });
 
     drawBtn.addEventListener('click', () => {
+        playSfx('click');
         drawGame();
     });
 
     restartBtn.addEventListener('click', () => {
+        playSfx('click');
         showModal('确认', '确定要开始新的一局吗？当前对局进度将丢失。', true, () => {
             showDifficultyModal();
         });
     });
 
     backToMenuBtn.addEventListener('click', () => {
+        playSfx('click');
         showModal('确认', '确定要返回主菜单吗？是否退出当前对局？', true, () => {
             // 保存放弃对局记录
             saveCurrentGame();
@@ -5148,6 +5745,7 @@ self.onmessage = function(e) {
     }
 
     hintBtn.addEventListener('click', () => {
+        playSfx('click');
         if (gameOver || currentPlayer !== 'red') return;
         
         // 显示提示中状态
@@ -5244,6 +5842,7 @@ self.onmessage = function(e) {
     }
 
     saveFenBtn.addEventListener('click', () => {
+        playSfx('click');
         const fen = boardToFen();
         navigator.clipboard.writeText(fen).then(() => {
             showModal('提示', 'FEN已复制到剪贴板！\n\n' + fen);
@@ -5253,6 +5852,7 @@ self.onmessage = function(e) {
     });
 
     loadFenBtn.addEventListener('click', () => {
+        playSfx('click');
         const fen = prompt('请输入FEN字符串：');
         if (!fen) return;
         
@@ -5296,8 +5896,7 @@ self.onmessage = function(e) {
         resetRegretLimitForNewGame();
         
         // 应用设置
-        const settings = window.gameSettings || { computeMode: 'gpu' };
-        computeMode = settings.computeMode;
+        computeMode = gameSettings.computeMode || 'gpu';
         
         // 更新AI难度显示
         updateAiDifficultyDisplay();
