@@ -1974,6 +1974,7 @@ function selectDifficulty(difficulty) {
     
     // 设置当前对局的AI难度
     window.currentGameDifficulty = difficulty;
+    currentGameDifficulty = difficulty;
     
     // 切换到游戏界面
     document.getElementById('mainMenu').style.display = 'none';
@@ -2206,7 +2207,7 @@ function saveGameRecords() {
     // 用于检测反复摩擦走子的历史记录
     let movePatterns = [];
     let maxPatternLength = 10; // 最多存储10个最近的走子模式
-    let frictionThreshold = 5; // 当相同模式出现5次时，认为是反复摩擦
+    let frictionThreshold = 3; // 当相同模式出现3次时，认为是反复摩擦
 
     function getDefaultRegretLimitByDifficulty(difficulty) {
         if (difficulty === 4) return 1;
@@ -2751,9 +2752,11 @@ function genMoves(bArr, side, state, out) {
 
 function evaluate(bArr, side, state) {
   let score = 0;
+  let pieceCount = 0;
   for (let sq=0; sq<BOARD_SIZE; sq++) {
     const p = bArr[sq];
     if (!p) continue;
+    pieceCount++;
     const r = rOf(sq), c = cOf(sq);
     let ps = 0;
     if (p === R_P) ps = (9 - r) * 4 + (c === 4 ? 8 : 0) + (r <= 4 ? 10 : 0);
@@ -2766,6 +2769,36 @@ function evaluate(bArr, side, state) {
     else if (p === R_B || p === B_B) ps = 2;
     const base = V[p] + ps;
     score += isRed(p) ? base : -base;
+  }
+
+  if (pieceCount >= 22) {
+    const devPenaltyN = 26;
+    const devPenaltyC = 18;
+    const devPenaltyB = 14;
+    const devPenaltyA = 10;
+    const devPenaltyR = 6;
+
+    if (bArr[idx(9, 1)] === R_N) score -= devPenaltyN;
+    if (bArr[idx(9, 7)] === R_N) score -= devPenaltyN;
+    if (bArr[idx(7, 1)] === R_C) score -= devPenaltyC;
+    if (bArr[idx(7, 7)] === R_C) score -= devPenaltyC;
+    if (bArr[idx(9, 2)] === R_B) score -= devPenaltyB;
+    if (bArr[idx(9, 6)] === R_B) score -= devPenaltyB;
+    if (bArr[idx(9, 3)] === R_A) score -= devPenaltyA;
+    if (bArr[idx(9, 5)] === R_A) score -= devPenaltyA;
+    if (bArr[idx(9, 0)] === R_R) score -= devPenaltyR;
+    if (bArr[idx(9, 8)] === R_R) score -= devPenaltyR;
+
+    if (bArr[idx(0, 1)] === B_N) score += devPenaltyN;
+    if (bArr[idx(0, 7)] === B_N) score += devPenaltyN;
+    if (bArr[idx(2, 1)] === B_C) score += devPenaltyC;
+    if (bArr[idx(2, 7)] === B_C) score += devPenaltyC;
+    if (bArr[idx(0, 2)] === B_B) score += devPenaltyB;
+    if (bArr[idx(0, 6)] === B_B) score += devPenaltyB;
+    if (bArr[idx(0, 3)] === B_A) score += devPenaltyA;
+    if (bArr[idx(0, 5)] === B_A) score += devPenaltyA;
+    if (bArr[idx(0, 0)] === B_R) score += devPenaltyR;
+    if (bArr[idx(0, 8)] === B_R) score += devPenaltyR;
   }
 
   for (let sq=0; sq<BOARD_SIZE; sq++) {
@@ -2971,7 +3004,7 @@ function quiescence(bArr, side, alpha, beta, state, ply, killers, history) {
   return alpha;
 }
 
-function searchBest(inputBoard, side, timeMs, debugMode) {
+function searchBest(inputBoard, side, timeMs, debugMode, lastAiMove) {
   const parsed = parseBoard(inputBoard);
   const bArr = parsed.b;
   const state = { redKing: parsed.redKing, blackKing: parsed.blackKing, hashKey: parsed.hashKey, hashLock: parsed.hashLock };
@@ -2979,6 +3012,30 @@ function searchBest(inputBoard, side, timeMs, debugMode) {
   const rootMoves = [];
   genMoves(bArr, side, state, rootMoves);
   if (rootMoves.length === 0) return { move: null, gameOver: true };
+
+  if (side === -1 && lastAiMove && rootMoves.length > 1 &&
+      Number.isFinite(lastAiMove.fromRow) && Number.isFinite(lastAiMove.fromCol) &&
+      Number.isFinite(lastAiMove.toRow) && Number.isFinite(lastAiMove.toCol)) {
+    const lastFrom = idx(lastAiMove.fromRow, lastAiMove.fromCol);
+    const lastTo = idx(lastAiMove.toRow, lastAiMove.toCol);
+    let w = 0;
+    for (let i=0; i<rootMoves.length; i++) {
+      const m = rootMoves[i];
+      const fr = (m >>> 8) & 0x7F;
+      const to = m & 0x7F;
+      const isReverse = (fr === lastTo && to === lastFrom);
+      if (isReverse) {
+        const cap = bArr[to];
+        if (cap !== EMPTY || givesCheck(bArr, m, side, state)) {
+          rootMoves[w++] = m;
+        }
+      } else {
+        rootMoves[w++] = m;
+      }
+    }
+    rootMoves.length = w;
+    if (rootMoves.length === 0) return { move: null, gameOver: true };
+  }
 
   const killers = new Array(256).fill(0);
   const history = {};
@@ -3038,13 +3095,13 @@ function searchBest(inputBoard, side, timeMs, debugMode) {
 }
 
 self.onmessage = function(e) {
-  const { board, difficulty, isHint, debugMode } = e.data || {};
+  const { board, difficulty, isHint, debugMode, lastAiMove } = e.data || {};
   const d = Math.max(0, Math.min(5, difficulty | 0));
-  const timeMsByDifficulty = [2000, 5000, 10000, 20000, 60000, 120000];
+  const timeMsByDifficulty = [3000, 8000, 15000, 30000, 60000, 150000];
   let timeMs = timeMsByDifficulty[d];
   if (isHint) timeMs = Math.max(250, (timeMs * 0.55) | 0);
   const side = isHint ? 1 : -1;
-  const result = searchBest(board, side, timeMs, !!debugMode);
+  const result = searchBest(board, side, timeMs, !!debugMode, lastAiMove);
   self.postMessage({ move: result.move, gameOver: !!result.gameOver, useGPU: false, bestScore: result.bestScore, depth: result.depth, nodes: result.nodes });
 };
 `;
@@ -3231,33 +3288,51 @@ self.onmessage = function(e) {
     }
     
     function checkFrictionPatterns() {
-        if (movePatterns.length < 4) return; // 需要至少4个走子才能形成摩擦
-        
-        // 检查最近的走子是否形成了摩擦模式
-        let frictionCount = 0;
-        for (let i = movePatterns.length - 4; i < movePatterns.length - 2; i++) {
-            const pattern1 = movePatterns[i];
-            const pattern2 = movePatterns[i + 1];
-            const pattern3 = movePatterns[i + 2];
-            const pattern4 = movePatterns[i + 3];
-            
-            // 检查是否形成了A-B-A-B的摩擦模式
-            if (pattern1.piece === pattern3.piece && 
-                pattern1.fromRow === pattern3.fromRow && 
-                pattern1.fromCol === pattern3.fromCol && 
-                pattern1.toRow === pattern3.toRow && 
-                pattern1.toCol === pattern3.toCol && 
-                pattern2.piece === pattern4.piece && 
-                pattern2.fromRow === pattern4.fromRow && 
-                pattern2.fromCol === pattern4.fromCol && 
-                pattern2.toRow === pattern4.toRow && 
-                pattern2.toCol === pattern4.toCol) {
-                frictionCount++;
-            }
+        if (gameOver) return;
+        if (movePatterns.length < 4) return;
+
+        const a = movePatterns[movePatterns.length - 4];
+        const b = movePatterns[movePatterns.length - 3];
+        const c = movePatterns[movePatterns.length - 2];
+        const d = movePatterns[movePatterns.length - 1];
+
+        const isABAB =
+            a.player === c.player &&
+            b.player === d.player &&
+            a.piece === c.piece &&
+            a.fromRow === c.fromRow &&
+            a.fromCol === c.fromCol &&
+            a.toRow === c.toRow &&
+            a.toCol === c.toCol &&
+            b.piece === d.piece &&
+            b.fromRow === d.fromRow &&
+            b.fromCol === d.fromCol &&
+            b.toRow === d.toRow &&
+            b.toCol === d.toCol;
+
+        if (!isABAB) return;
+
+        let count = 0;
+        for (let i = 0; i <= movePatterns.length - 4; i++) {
+            const p1 = movePatterns[i];
+            const p2 = movePatterns[i + 1];
+            const p3 = movePatterns[i + 2];
+            const p4 = movePatterns[i + 3];
+            const same =
+                p1.player === a.player && p2.player === b.player && p3.player === c.player && p4.player === d.player &&
+                p1.piece === a.piece && p1.fromRow === a.fromRow && p1.fromCol === a.fromCol && p1.toRow === a.toRow && p1.toCol === a.toCol &&
+                p2.piece === b.piece && p2.fromRow === b.fromRow && p2.fromCol === b.fromCol && p2.toRow === b.toRow && p2.toCol === b.toCol &&
+                p3.piece === c.piece && p3.fromRow === c.fromRow && p3.fromCol === c.fromCol && p3.toRow === c.toRow && p3.toCol === c.toCol &&
+                p4.piece === d.piece && p4.fromRow === d.fromRow && p4.fromCol === d.fromCol && p4.toRow === d.toRow && p4.toCol === d.toCol;
+            if (same) count++;
         }
-        
-        if (frictionCount >= frictionThreshold) {
-            return;
+
+        if (count >= frictionThreshold) {
+            gameOver = true;
+            gameStatusEl.innerText = '和局（重复走子）';
+            drawBoard();
+            localStorage.removeItem('currentGame');
+            setTimeout(() => showGameOverModal('draw', '双方反复走子，判和。', '重复走子'), 300);
         }
     }
 
@@ -4816,7 +4891,7 @@ self.onmessage = function(e) {
         
         drawBoard();
 
-        const difficulty = currentGameDifficulty;
+        const difficulty = window.currentGameDifficulty ?? currentGameDifficulty;
 
         if (!aiWorker) {
             aiWorker = new Worker(workerUrl);
@@ -4908,6 +4983,8 @@ self.onmessage = function(e) {
         aiWorker.postMessage({
             board: board,
             difficulty: difficulty,
+            lastAiMove: lastAiMove,
+            movePatterns: movePatterns.slice(-8),
             moveList: moveList,
             computeMode: computeMode,
             debugMode: gameSettings.debugMode
@@ -5379,7 +5456,7 @@ self.onmessage = function(e) {
         
         hintWorker.postMessage({
             board: board,
-            difficulty: currentGameDifficulty,
+            difficulty: window.currentGameDifficulty ?? currentGameDifficulty,
             moveList: moveList,
             computeMode: computeMode,
             isHint: true
