@@ -2313,916 +2313,739 @@ function saveGameRecords() {
         }
     }
 
-    // Worker代码
+    // Worker代码（重写AI）
     const workerCode = `
 const ROWS = 10;
 const COLS = 9;
-const EMPTY = '';
+const BOARD_SIZE = 90;
 
-function copyBoard(src) {
-    return src.map(row => [...row]);
+const EMPTY = 0;
+const R_K = 1, R_A = 2, R_B = 3, R_N = 4, R_R = 5, R_C = 6, R_P = 7;
+const B_K = 8, B_A = 9, B_B = 10, B_N = 11, B_R = 12, B_C = 13, B_P = 14;
+
+const V = [0, 100000, 120, 120, 270, 600, 330, 80, 100000, 120, 120, 270, 600, 330, 80];
+
+let seed = 2166136261 >>> 0;
+function rand32() {
+  seed ^= (seed << 13) >>> 0;
+  seed ^= (seed >>> 17) >>> 0;
+  seed ^= (seed << 5) >>> 0;
+  return seed >>> 0;
 }
 
-function getPieceColor(piece) {
-    if (!piece) return null;
-    return (piece >= 'A' && piece <= 'Z') ? 'red' : 'black';
+const ZK = Array.from({ length: 15 }, () => new Uint32Array(BOARD_SIZE));
+const ZL = Array.from({ length: 15 }, () => new Uint32Array(BOARD_SIZE));
+for (let p = 0; p < 15; p++) {
+  for (let s = 0; s < BOARD_SIZE; s++) {
+    ZK[p][s] = rand32();
+    ZL[p][s] = rand32();
+  }
 }
 
-function sameColor(piece1, piece2) {
-    if (!piece1 || !piece2) return false;
-    return (piece1 >= 'A' && piece1 <= 'Z') === (piece2 >= 'A' && piece2 <= 'Z');
+const TT_SIZE = 1 << 19;
+const TT_MASK = TT_SIZE - 1;
+const ttKey = new Uint32Array(TT_SIZE);
+const ttLock = new Uint32Array(TT_SIZE);
+const ttVal = new Int32Array(TT_SIZE);
+const ttMove = new Uint16Array(TT_SIZE);
+const ttMeta = new Int16Array(TT_SIZE);
+const TT_EXACT = 0;
+const TT_LOWER = 1;
+const TT_UPPER = 2;
+
+function idx(r, c) { return r * 9 + c; }
+function rOf(i) { return (i / 9) | 0; }
+function cOf(i) { return i % 9; }
+
+function colorOf(p) {
+  if (p >= 1 && p <= 7) return 1;
+  if (p >= 8 && p <= 14) return -1;
+  return 0;
 }
 
-function isValidAttack(board, piece, fromRow, fromCol, toRow, toCol) {
-    if (fromRow === toRow && fromCol === toCol) return false;
-    const p = piece.toLowerCase();
-    const deltaRow = toRow - fromRow;
-    const deltaCol = toCol - fromCol;
-    const stepRow = deltaRow === 0 ? 0 : (deltaRow > 0 ? 1 : -1);
-    const stepCol = deltaCol === 0 ? 0 : (deltaCol > 0 ? 1 : -1);
-    const targetPiece = board[toRow][toCol];
-    
-    if (targetPiece && sameColor(piece, targetPiece)) return false;
+function isRed(p) { return p >= 1 && p <= 7; }
+function isBlack(p) { return p >= 8 && p <= 14; }
 
-    if (p === 'r') {
-        if (fromRow !== toRow && fromCol !== toCol) return false;
-        let r = fromRow + stepRow, c = fromCol + stepCol;
-        while (r !== toRow || c !== toCol) {
-            if (board[r][c] !== EMPTY) return false;
-            r += stepRow; c += stepCol;
-        }
-        return true;
-    }
-    if (p === 'n') {
-        let legalMoves = [
-            [-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]
-        ];
-        for (let [dr,dc] of legalMoves) {
-            if (fromRow+dr === toRow && fromCol+dc === toCol) {
-                if (Math.abs(dr) === 2) {
-                    if (board[fromRow + (dr>0?1:-1)][fromCol] !== EMPTY) return false;
-                } else {
-                    if (board[fromRow][fromCol + (dc>0?1:-1)] !== EMPTY) return false;
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function getCheckThreats(board, color) {
-        let threats = [];
-        let kingRow, kingCol;
-        const kingPiece = (color === 'red') ? 'K' : 'k';
-        for (let r=0; r<ROWS; r++) {
-            for (let c=0; c<COLS; c++) {
-                if (board[r][c] === kingPiece) {
-                    kingRow = r; kingCol = c;
-                }
-            }
-        }
-        // 如果找不到国王，返回空数组（避免undefined错误）
-        if (kingRow === undefined || kingCol === undefined) {
-            return threats;
-        }
-        for (let r=0; r<ROWS; r++) {
-            for (let c=0; c<COLS; c++) {
-                const piece = board[r][c];
-                if (piece && getPieceColor(piece) !== color) {
-                    if (isValidAttack(board, piece, r, c, kingRow, kingCol)) {
-                        threats.push({
-                            piece: piece,
-                            fromRow: r,
-                            fromCol: c,
-                            toRow: kingRow,
-                            toCol: kingCol
-                        });
-                    }
-                }
-            }
-        }
-        return threats;
-    }
-
-    function getCheckThreats(board, color) {
-        let threats = [];
-        let kingRow, kingCol;
-        const kingPiece = (color === 'red') ? 'K' : 'k';
-        for (let r=0; r<ROWS; r++) {
-            for (let c=0; c<COLS; c++) {
-                if (board[r][c] === kingPiece) {
-                    kingRow = r; kingCol = c;
-                }
-            }
-        }
-        // 如果找不到国王，返回空数组（避免undefined错误）
-        if (kingRow === undefined || kingCol === undefined) {
-            return threats;
-        }
-        for (let r=0; r<ROWS; r++) {
-            for (let c=0; c<COLS; c++) {
-                const piece = board[r][c];
-                if (piece && getPieceColor(piece) !== color) {
-                    if (isValidAttack(board, piece, r, c, kingRow, kingCol)) {
-                        threats.push({
-                            piece: piece,
-                            fromRow: r,
-                            fromCol: c,
-                            toRow: kingRow,
-                            toCol: kingCol
-                        });
-                    }
-                }
-            }
-        }
-        return threats;
-    }
-    if (p === 'b') {
-        if (Math.abs(deltaRow) !== 2 || Math.abs(deltaCol) !== 2) return false;
-        if (board[fromRow + (deltaRow>0?1:-1)][fromCol + (deltaCol>0?1:-1)] !== EMPTY) return false;
-        if (piece === 'B' && toRow < 5) return false;
-        if (piece === 'b' && toRow > 4) return false;
-        return true;
-    }
-    if (p === 'a') {
-        if (Math.abs(deltaRow)!==1 || Math.abs(deltaCol)!==1) return false;
-        if (piece === 'A' && (toCol<3 || toCol>5 || toRow<7)) return false;
-        if (piece === 'a' && (toCol<3 || toCol>5 || toRow>2)) return false;
-        return true;
-    }
-    if (p === 'k') {
-        if (Math.abs(deltaRow) + Math.abs(deltaCol) !== 1) return false;
-        if (piece === 'K' && (toCol<3 || toCol>5 || toRow<7)) return false;
-        if (piece === 'k' && (toCol<3 || toCol>5 || toRow>2)) return false;
-        return true;
-    }
-    if (p === 'c') {
-            if (fromRow !== toRow && fromCol !== toCol) return false;
-            let cnt = 0;
-            let r = fromRow + stepRow, c = fromCol + stepCol;
-            while (r !== toRow || c !== toCol) {
-                if (board[r][c] !== EMPTY) cnt++;
-                r += stepRow; c += stepCol;
-            }
-            // 炮只有在吃子的时候才攻击，此时需要中间有一个棋子
-            if (targetPiece !== EMPTY) return cnt === 1;
-            return cnt === 0;
-        }
-    if (p === 'p') {
-        if (piece === 'P') {
-            if (toRow < fromRow && deltaCol === 0 && toRow === fromRow - 1) return true;
-            if (fromRow <= 4 && toRow === fromRow && Math.abs(deltaCol) === 1) return true;
-            return false;
-        }
-        if (piece === 'p') {
-            if (toRow > fromRow && deltaCol === 0 && toRow === fromRow + 1) return true;
-            if (fromRow >= 5 && toRow === fromRow && Math.abs(deltaCol) === 1) return true;
-            return false;
-        }
-    }
-    return false;
+function inBoard(r, c) { return r >= 0 && r < 10 && c >= 0 && c < 9; }
+function inPalace(color, r, c) {
+  if (c < 3 || c > 5) return false;
+  return color === 1 ? (r >= 7 && r <= 9) : (r >= 0 && r <= 2);
 }
 
-function kingsFacing(board) {
-    let redKingPos, blackKingPos;
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            const p = board[r][c];
-            if (p === 'K') redKingPos = [r,c];
-            if (p === 'k') blackKingPos = [r,c];
+function copyArr(a) { return a.slice(); }
+
+function parseBoard(input) {
+  const b = new Array(BOARD_SIZE).fill(0);
+  let redKing = -1, blackKing = -1;
+  let hashKey = 0 >>> 0;
+  let hashLock = 0 >>> 0;
+  for (let r=0; r<10; r++) {
+    for (let c=0; c<9; c++) {
+      const s = input[r][c];
+      let p = 0;
+      if (!s) p = 0;
+      else if (s === 'K') p = R_K;
+      else if (s === 'A') p = R_A;
+      else if (s === 'B') p = R_B;
+      else if (s === 'N') p = R_N;
+      else if (s === 'R') p = R_R;
+      else if (s === 'C') p = R_C;
+      else if (s === 'P') p = R_P;
+      else if (s === 'k') p = B_K;
+      else if (s === 'a') p = B_A;
+      else if (s === 'b') p = B_B;
+      else if (s === 'n') p = B_N;
+      else if (s === 'r') p = B_R;
+      else if (s === 'c') p = B_C;
+      else if (s === 'p') p = B_P;
+      const sq = idx(r,c);
+      b[sq] = p;
+      if (p) {
+        hashKey ^= ZK[p][sq];
+        hashLock ^= ZL[p][sq];
+      }
+      if (p === R_K) redKing = idx(r,c);
+      if (p === B_K) blackKing = idx(r,c);
+    }
+  }
+  return { b, redKing, blackKing, hashKey: hashKey >>> 0, hashLock: hashLock >>> 0 };
+}
+
+function toMoveObj(m, bArr) {
+  const fr = (m >>> 8) & 0x7F;
+  const to = m & 0x7F;
+  const piece = bArr[fr];
+  return {
+    fromRow: rOf(fr),
+    fromCol: cOf(fr),
+    toRow: rOf(to),
+    toCol: cOf(to),
+    piece: pieceIdToChar(piece)
+  };
+}
+
+function pieceIdToChar(p) {
+  switch (p) {
+    case R_K: return 'K';
+    case R_A: return 'A';
+    case R_B: return 'B';
+    case R_N: return 'N';
+    case R_R: return 'R';
+    case R_C: return 'C';
+    case R_P: return 'P';
+    case B_K: return 'k';
+    case B_A: return 'a';
+    case B_B: return 'b';
+    case B_N: return 'n';
+    case B_R: return 'r';
+    case B_C: return 'c';
+    case B_P: return 'p';
+    default: return '';
+  }
+}
+
+function kingsFacing(bArr, redKing, blackKing) {
+  if (redKing < 0 || blackKing < 0) return false;
+  const rc = cOf(redKing), bc = cOf(blackKing);
+  if (rc !== bc) return false;
+  let r1 = rOf(redKing), r2 = rOf(blackKing);
+  if (r1 > r2) { const t = r1; r1 = r2; r2 = t; }
+  for (let r = r1 + 1; r < r2; r++) {
+    if (bArr[idx(r, rc)] !== EMPTY) return false;
+  }
+  return true;
+}
+
+function isAttacked(bArr, sq, byColor, redKing, blackKing) {
+  const tr = rOf(sq), tc = cOf(sq);
+
+  if (byColor === 1) {
+    const r = tr + 1;
+    if (r < 10 && bArr[idx(r, tc)] === R_P) return true;
+    if (tr <= 4) {
+      if (tc - 1 >= 0 && bArr[idx(tr, tc - 1)] === R_P) return true;
+      if (tc + 1 < 9 && bArr[idx(tr, tc + 1)] === R_P) return true;
+    }
+  } else {
+    const r = tr - 1;
+    if (r >= 0 && bArr[idx(r, tc)] === B_P) return true;
+    if (tr >= 5) {
+      if (tc - 1 >= 0 && bArr[idx(tr, tc - 1)] === B_P) return true;
+      if (tc + 1 < 9 && bArr[idx(tr, tc + 1)] === B_P) return true;
+    }
+  }
+
+  const knight = byColor === 1 ? R_N : B_N;
+  const kMoves = [
+    [-2,-1,-1,0],[-2,1,-1,0],[2,-1,1,0],[2,1,1,0],
+    [-1,-2,0,-1],[1,-2,0,-1],[-1,2,0,1],[1,2,0,1]
+  ];
+  for (let i=0; i<kMoves.length; i++) {
+    const dr = kMoves[i][0], dc = kMoves[i][1];
+    const lr = kMoves[i][2], lc = kMoves[i][3];
+    const legR = tr + lr, legC = tc + lc;
+    const fr = tr + dr, fc = tc + dc;
+    if (!inBoard(fr, fc) || !inBoard(legR, legC)) continue;
+    if (bArr[idx(legR, legC)] !== EMPTY) continue;
+    if (bArr[idx(fr, fc)] === knight) return true;
+  }
+
+  const rook = byColor === 1 ? R_R : B_R;
+  const cannon = byColor === 1 ? R_C : B_C;
+
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  for (let di=0; di<dirs.length; di++) {
+    const dr = dirs[di][0], dc = dirs[di][1];
+    let r = tr + dr, c = tc + dc;
+    let screen = 0;
+    while (inBoard(r,c)) {
+      const p = bArr[idx(r,c)];
+      if (p !== EMPTY) {
+        if (screen === 0) {
+          if (p === rook) return true;
+          screen = 1;
+        } else {
+          if (p === cannon) return true;
+          break;
         }
+      }
+      r += dr; c += dc;
     }
-    if (!redKingPos || !blackKingPos) return false;
-    if (redKingPos[1] !== blackKingPos[1]) return false;
-    let col = redKingPos[1];
-    let minRow = Math.min(redKingPos[0], blackKingPos[0]);
-    let maxRow = Math.max(redKingPos[0], blackKingPos[0]);
-    for (let r = minRow+1; r < maxRow; r++) {
-        if (board[r][col] !== EMPTY) return false;
+  }
+
+  const king = byColor === 1 ? R_K : B_K;
+  if (inPalace(byColor, tr, tc)) {
+    const kAdj = [[-1,0],[1,0],[0,-1],[0,1]];
+    for (let i=0; i<4; i++) {
+      const rr = tr + kAdj[i][0], cc = tc + kAdj[i][1];
+      if (!inBoard(rr,cc)) continue;
+      if (bArr[idx(rr,cc)] === king) return true;
     }
+  }
+  const kSq = byColor === 1 ? redKing : blackKing;
+  if (kSq >= 0 && cOf(kSq) === tc) {
+    const kr = rOf(kSq);
+    let r1 = Math.min(kr, tr), r2 = Math.max(kr, tr);
+    let clear = true;
+    for (let rr = r1 + 1; rr < r2; rr++) {
+      if (bArr[idx(rr, tc)] !== EMPTY) { clear = false; break; }
+    }
+    if (clear) return true;
+  }
+
+  const adv = byColor === 1 ? R_A : B_A;
+  const ele = byColor === 1 ? R_B : B_B;
+
+  const aDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  for (let i=0; i<4; i++) {
+    const r = tr + aDirs[i][0], c = tc + aDirs[i][1];
+    if (!inBoard(r,c)) continue;
+    const s = idx(r,c);
+    if (bArr[s] === adv && inPalace(byColor, tr, tc)) return true;
+  }
+
+  const eDirs = [[-2,-2],[-2,2],[2,-2],[2,2]];
+  for (let i=0; i<4; i++) {
+    const r = tr + eDirs[i][0], c = tc + eDirs[i][1];
+    const er = tr + eDirs[i][0]/2, ec = tc + eDirs[i][1]/2;
+    if (!inBoard(r,c) || !inBoard(er,ec)) continue;
+    const from = idx(r,c);
+    if (bArr[from] !== ele) continue;
+    if (bArr[idx(er,ec)] !== EMPTY) continue;
+    if (byColor === 1 && tr < 5) continue;
+    if (byColor === -1 && tr > 4) continue;
     return true;
+  }
+
+  return false;
 }
 
-function isInCheck(board, color) {
-    let kingRow, kingCol;
-    const kingPiece = (color === 'red') ? 'K' : 'k';
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            if (board[r][c] === kingPiece) {
-                kingRow = r; kingCol = c;
-            }
-        }
-    }
-    if (kingRow === undefined || kingCol === undefined) return false;
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            const piece = board[r][c];
-            if (piece && getPieceColor(piece) !== color) {
-                if (isValidAttack(board, piece, r, c, kingRow, kingCol)) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+function makeMove(bArr, move, state) {
+  const fr = (move >>> 8) & 0x7F;
+  const to = move & 0x7F;
+  const p = bArr[fr];
+  const cap = bArr[to];
+  const oldHashKey = state.hashKey;
+  const oldHashLock = state.hashLock;
+  state.hashKey = (state.hashKey ^ ZK[p][fr] ^ ZK[p][to] ^ (cap ? ZK[cap][to] : 0)) >>> 0;
+  state.hashLock = (state.hashLock ^ ZL[p][fr] ^ ZL[p][to] ^ (cap ? ZL[cap][to] : 0)) >>> 0;
+  bArr[to] = p;
+  bArr[fr] = EMPTY;
+  const oldRedK = state.redKing;
+  const oldBlackK = state.blackKing;
+  if (p === R_K) state.redKing = to;
+  else if (p === B_K) state.blackKing = to;
+  return { fr, to, p, cap, oldRedK, oldBlackK, oldHashKey, oldHashLock };
 }
 
-function isSquareAttacked(board, row, col, attackerColor) {
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            const piece = board[r][c];
-            if (!piece) continue;
-            if (getPieceColor(piece) !== attackerColor) continue;
-            if (isValidAttack(board, piece, r, c, row, col)) return true;
-        }
-    }
-    return false;
+function unmakeMove(bArr, u, state) {
+  bArr[u.fr] = u.p;
+  bArr[u.to] = u.cap;
+  state.redKing = u.oldRedK;
+  state.blackKing = u.oldBlackK;
+  state.hashKey = u.oldHashKey;
+  state.hashLock = u.oldHashLock;
 }
 
-function makeMove(board, move) {
-    const piece = board[move.fromRow][move.fromCol];
-    const captured = board[move.toRow][move.toCol];
-    board[move.fromRow][move.fromCol] = EMPTY;
-    board[move.toRow][move.toCol] = piece;
-    return captured;
+function genMoves(bArr, side, state, out) {
+  out.length = 0;
+  for (let sq=0; sq<BOARD_SIZE; sq++) {
+    const p = bArr[sq];
+    if (!p) continue;
+    const c = colorOf(p);
+    if (c !== side) continue;
+    const r = rOf(sq), c0 = cOf(sq);
+    if (p === R_R || p === B_R) {
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (let di=0; di<4; di++) {
+        const dr = dirs[di][0], dc = dirs[di][1];
+        let rr=r+dr, cc=c0+dc;
+        while (inBoard(rr,cc)) {
+          const t = idx(rr,cc);
+          const tp = bArr[t];
+          if (!tp) out.push((sq<<8)|t);
+          else {
+            if (colorOf(tp) !== side) out.push((sq<<8)|t);
+            break;
+          }
+          rr+=dr; cc+=dc;
+        }
+      }
+      continue;
+    }
+    if (p === R_C || p === B_C) {
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (let di=0; di<4; di++) {
+        const dr = dirs[di][0], dc = dirs[di][1];
+        let rr=r+dr, cc=c0+dc;
+        while (inBoard(rr,cc) && bArr[idx(rr,cc)] === EMPTY) {
+          out.push((sq<<8)|idx(rr,cc));
+          rr+=dr; cc+=dc;
+        }
+        while (inBoard(rr,cc) && bArr[idx(rr,cc)] === EMPTY) {
+          rr+=dr; cc+=dc;
+        }
+        rr+=dr; cc+=dc;
+        while (inBoard(rr,cc)) {
+          const t = idx(rr,cc);
+          const tp = bArr[t];
+          if (tp !== EMPTY) {
+            if (colorOf(tp) !== side) out.push((sq<<8)|t);
+            break;
+          }
+          rr+=dr; cc+=dc;
+        }
+      }
+      continue;
+    }
+    if (p === R_N || p === B_N) {
+      const cand = [
+        [-2,-1,-1,0],[-2,1,-1,0],[2,-1,1,0],[2,1,1,0],
+        [-1,-2,0,-1],[1,-2,0,-1],[-1,2,0,1],[1,2,0,1]
+      ];
+      for (let i=0; i<cand.length; i++) {
+        const dr = cand[i][0], dc = cand[i][1];
+        const lr = cand[i][2], lc = cand[i][3];
+        const legR = r + lr, legC = c0 + lc;
+        const rr = r + dr, cc = c0 + dc;
+        if (!inBoard(rr,cc) || !inBoard(legR,legC)) continue;
+        if (bArr[idx(legR,legC)] !== EMPTY) continue;
+        const t = idx(rr,cc);
+        const tp = bArr[t];
+        if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+      }
+      continue;
+    }
+    if (p === R_B || p === B_B) {
+      const cand = [[-2,-2],[-2,2],[2,-2],[2,2]];
+      for (let i=0; i<4; i++) {
+        const rr = r + cand[i][0], cc = c0 + cand[i][1];
+        const er = r + cand[i][0]/2, ec = c0 + cand[i][1]/2;
+        if (!inBoard(rr,cc) || !inBoard(er,ec)) continue;
+        if (bArr[idx(er,ec)] !== EMPTY) continue;
+        if (side === 1 && rr < 5) continue;
+        if (side === -1 && rr > 4) continue;
+        const t = idx(rr,cc);
+        const tp = bArr[t];
+        if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+      }
+      continue;
+    }
+    if (p === R_A || p === B_A) {
+      const cand = [[-1,-1],[-1,1],[1,-1],[1,1]];
+      for (let i=0; i<4; i++) {
+        const rr = r + cand[i][0], cc = c0 + cand[i][1];
+        if (!inBoard(rr,cc) || !inPalace(side, rr, cc)) continue;
+        const t = idx(rr,cc);
+        const tp = bArr[t];
+        if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+      }
+      continue;
+    }
+    if (p === R_K || p === B_K) {
+      const cand = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (let i=0; i<4; i++) {
+        const rr = r + cand[i][0], cc = c0 + cand[i][1];
+        if (!inBoard(rr,cc) || !inPalace(side, rr, cc)) continue;
+        const t = idx(rr,cc);
+        const tp = bArr[t];
+        if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+      }
+      continue;
+    }
+    if (p === R_P || p === B_P) {
+      if (side === 1) {
+        const rr = r - 1;
+        if (rr >= 0) {
+          const t = idx(rr,c0);
+          const tp = bArr[t];
+          if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+        }
+        if (r <= 4) {
+          if (c0 - 1 >= 0) {
+            const t = idx(r, c0 - 1);
+            const tp = bArr[t];
+            if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+          }
+          if (c0 + 1 < 9) {
+            const t = idx(r, c0 + 1);
+            const tp = bArr[t];
+            if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+          }
+        }
+      } else {
+        const rr = r + 1;
+        if (rr < 10) {
+          const t = idx(rr,c0);
+          const tp = bArr[t];
+          if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+        }
+        if (r >= 5) {
+          if (c0 - 1 >= 0) {
+            const t = idx(r, c0 - 1);
+            const tp = bArr[t];
+            if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+          }
+          if (c0 + 1 < 9) {
+            const t = idx(r, c0 + 1);
+            const tp = bArr[t];
+            if (!tp || colorOf(tp) !== side) out.push((sq<<8)|t);
+          }
+        }
+      }
+      continue;
+    }
+  }
+
+  let w = 0;
+  for (let i=0; i<out.length; i++) {
+    const m = out[i];
+    const u = makeMove(bArr, m, state);
+    const illegal = kingsFacing(bArr, state.redKing, state.blackKing) ||
+      isAttacked(bArr, side === 1 ? state.redKing : state.blackKing, -side, state.redKing, state.blackKing);
+    unmakeMove(bArr, u, state);
+    if (!illegal) out[w++] = m;
+  }
+  out.length = w;
 }
 
-function unmakeMove(board, move, captured) {
-    board[move.fromRow][move.fromCol] = move.piece;
-    board[move.toRow][move.toCol] = captured;
+function evaluate(bArr, side, state) {
+  let score = 0;
+  for (let sq=0; sq<BOARD_SIZE; sq++) {
+    const p = bArr[sq];
+    if (!p) continue;
+    const r = rOf(sq), c = cOf(sq);
+    let ps = 0;
+    if (p === R_P) ps = (9 - r) * 4 + (c === 4 ? 8 : 0) + (r <= 4 ? 10 : 0);
+    else if (p === B_P) ps = r * 4 + (c === 4 ? 8 : 0) + (r >= 5 ? 10 : 0);
+    else if (p === R_N) ps = (4 - Math.abs(r - 5)) * 6 + (4 - Math.abs(c - 4)) * 6;
+    else if (p === B_N) ps = (4 - Math.abs((9 - r) - 5)) * 6 + (4 - Math.abs(c - 4)) * 6;
+    else if (p === R_R || p === B_R) ps = (4 - Math.abs(c - 4)) * 4;
+    else if (p === R_C || p === B_C) ps = (4 - Math.abs(c - 4)) * 3;
+    else if (p === R_A || p === B_A) ps = 2;
+    else if (p === R_B || p === B_B) ps = 2;
+    const base = V[p] + ps;
+    score += isRed(p) ? base : -base;
+  }
+
+  for (let sq=0; sq<BOARD_SIZE; sq++) {
+    const p = bArr[sq];
+    if (!p) continue;
+    if (p === R_K || p === B_K) continue;
+    const pc = isRed(p) ? 1 : -1;
+    const attacked = isAttacked(bArr, sq, -pc, state.redKing, state.blackKing);
+    if (!attacked) continue;
+    const defended = isAttacked(bArr, sq, pc, state.redKing, state.blackKing);
+    const penalty = defended ? (V[p] * 0.18) : (V[p] * 0.42);
+    score += pc === 1 ? -penalty : penalty;
+  }
+
+  if (state.redKing >= 0) {
+    const rk = state.redKing;
+    const danger = isAttacked(bArr, rk, -1, state.redKing, state.blackKing) ? 1 : 0;
+    score -= danger * 160;
+  }
+  if (state.blackKing >= 0) {
+    const bk = state.blackKing;
+    const danger = isAttacked(bArr, bk, 1, state.redKing, state.blackKing) ? 1 : 0;
+    score += danger * 180;
+  }
+
+  return side === 1 ? score : -score;
 }
 
-function moveLeavesSelfInCheck(board, move, color) {
-    const captured = makeMove(board, move);
-    const bad = isInCheck(board, color) || kingsFacing(board);
-    unmakeMove(board, move, captured);
-    return bad;
+function mvvLvaScore(bArr, m) {
+  const fr = (m >>> 8) & 0x7F;
+  const to = m & 0x7F;
+  const cap = bArr[to];
+  if (!cap) return 0;
+  const att = bArr[fr];
+  return (V[cap] * 10) - V[att];
 }
 
-function inPalace(color, row, col) {
-    if (col < 3 || col > 5) return false;
-    if (color === 'red') return row >= 7 && row <= 9;
-    return row >= 0 && row <= 2;
+function givesCheck(bArr, m, side, state) {
+  const u = makeMove(bArr, m, state);
+  const kingSq = side === 1 ? state.blackKing : state.redKing;
+  const yes = isAttacked(bArr, kingSq, side, state.redKing, state.blackKing);
+  unmakeMove(bArr, u, state);
+  return yes;
 }
 
-function generatePseudoMovesForPiece(board, fromRow, fromCol, piece, outMoves) {
-    const color = getPieceColor(piece);
-    const p = piece.toLowerCase();
-
-    function push(toRow, toCol) {
-        if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) return;
-        const target = board[toRow][toCol];
-        if (target && sameColor(piece, target)) return;
-        outMoves.push({ fromRow, fromCol, toRow, toCol, piece });
-    }
-
-    if (p === 'r') {
-        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-        for (let i=0; i<dirs.length; i++) {
-            const dr = dirs[i][0], dc = dirs[i][1];
-            let r = fromRow + dr, c = fromCol + dc;
-            while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-                const target = board[r][c];
-                if (!target) {
-                    push(r, c);
-                } else {
-                    if (!sameColor(piece, target)) push(r, c);
-                    break;
-                }
-                r += dr; c += dc;
-            }
-        }
-        return;
-    }
-
-    if (p === 'c') {
-        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-        for (let i=0; i<dirs.length; i++) {
-            const dr = dirs[i][0], dc = dirs[i][1];
-            let r = fromRow + dr, c = fromCol + dc;
-            while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === EMPTY) {
-                push(r, c);
-                r += dr; c += dc;
-            }
-            while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === EMPTY) {
-                r += dr; c += dc;
-            }
-            r += dr; c += dc;
-            while (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
-                const target = board[r][c];
-                if (target !== EMPTY) {
-                    if (!sameColor(piece, target)) push(r, c);
-                    break;
-                }
-                r += dr; c += dc;
-            }
-        }
-        return;
-    }
-
-    if (p === 'n') {
-        const candidates = [
-            [-2,-1,-1,0],[-2,1,-1,0], [2,-1,1,0],[2,1,1,0],
-            [-1,-2,0,-1],[1,-2,0,-1], [-1,2,0,1],[1,2,0,1]
-        ];
-        for (let i=0; i<candidates.length; i++) {
-            const dr = candidates[i][0], dc = candidates[i][1];
-            const lr = candidates[i][2], lc = candidates[i][3];
-            const legRow = fromRow + lr, legCol = fromCol + lc;
-            if (legRow < 0 || legRow >= ROWS || legCol < 0 || legCol >= COLS) continue;
-            if (board[legRow][legCol] !== EMPTY) continue;
-            push(fromRow + dr, fromCol + dc);
-        }
-        return;
-    }
-
-    if (p === 'b') {
-        const dirs = [[-2,-2],[-2,2],[2,-2],[2,2]];
-        for (let i=0; i<dirs.length; i++) {
-            const dr = dirs[i][0], dc = dirs[i][1];
-            const eyeRow = fromRow + dr/2, eyeCol = fromCol + dc/2;
-            const toRow = fromRow + dr, toCol = fromCol + dc;
-            if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) continue;
-            if (board[eyeRow][eyeCol] !== EMPTY) continue;
-            if (color === 'red' && toRow < 5) continue;
-            if (color === 'black' && toRow > 4) continue;
-            push(toRow, toCol);
-        }
-        return;
-    }
-
-    if (p === 'a') {
-        const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
-        for (let i=0; i<dirs.length; i++) {
-            const toRow = fromRow + dirs[i][0], toCol = fromCol + dirs[i][1];
-            if (!inPalace(color, toRow, toCol)) continue;
-            push(toRow, toCol);
-        }
-        return;
-    }
-
-    if (p === 'k') {
-        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-        for (let i=0; i<dirs.length; i++) {
-            const toRow = fromRow + dirs[i][0], toCol = fromCol + dirs[i][1];
-            if (!inPalace(color, toRow, toCol)) continue;
-            push(toRow, toCol);
-        }
-        return;
-    }
-
-    if (p === 'p') {
-        if (color === 'red') {
-            push(fromRow - 1, fromCol);
-            if (fromRow <= 4) {
-                push(fromRow, fromCol - 1);
-                push(fromRow, fromCol + 1);
-            }
-        } else {
-            push(fromRow + 1, fromCol);
-            if (fromRow >= 5) {
-                push(fromRow, fromCol - 1);
-                push(fromRow, fromCol + 1);
-            }
-        }
-        return;
-    }
+function isQuiet(bArr, m) {
+  const to = m & 0x7F;
+  return bArr[to] === EMPTY;
 }
 
-function getAllLegalMoves(board, color) {
-    const pseudo = [];
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            const piece = board[r][c];
-            if (!piece) continue;
-            if (getPieceColor(piece) !== color) continue;
-            generatePseudoMovesForPiece(board, r, c, piece, pseudo);
-        }
-    }
+let stopTime = 0;
+let nodes = 0;
+let abort = false;
 
-    const legal = [];
-    for (let i=0; i<pseudo.length; i++) {
-        const m = pseudo[i];
-        if (!moveLeavesSelfInCheck(board, m, color)) legal.push(m);
-    }
-    return legal;
+function shouldStop() {
+  nodes++;
+  if ((nodes & 2047) === 0) {
+    if (Date.now() >= stopTime) abort = true;
+  }
+  return abort;
 }
 
-const pieceValues = {
-    'k': 100000, 'a': 250, 'b': 250, 'n': 450, 'r': 1000, 'c': 500, 'p': 100,
-    'K': 100000, 'A': 250, 'B': 250, 'N': 450, 'R': 1000, 'C': 500, 'P': 100
-};
-
-function getPosBonus(piece, row, col) {
-    const p = piece.toLowerCase();
-    if (p === 'p') {
-        if (piece === 'P') {
-            if (row <= 4) return 20;
-            return (9 - row) * 10;
-        } else {
-            if (row >= 5) return 20;
-            return row * 10;
-        }
-    }
-    if (p === 'n') {
-        const centerBonus = (4 - Math.abs(row - 4.5)) + (4 - Math.abs(col - 4));
-        return centerBonus * 5;
-    }
-    if (p === 'r' || p === 'c') {
-        const centerBonus = (4 - Math.abs(row - 4.5)) + (4 - Math.abs(col - 4));
-        return centerBonus * 3;
-    }
-    return 0;
+function ttIndex(state) {
+  const i = state.hashKey & TT_MASK;
+  if (ttKey[i] === state.hashKey && ttLock[i] === state.hashLock) return i;
+  return -1;
 }
 
-function buildMobilityMap(moves) {
-    const map = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-    for (let i = 0; i < moves.length; i++) {
-        const m = moves[i];
-        map[m.fromRow][m.fromCol] += 1;
-    }
-    return map;
+function ttBestMove(state) {
+  const i = ttIndex(state);
+  if (i < 0) return 0;
+  return ttMove[i] | 0;
 }
 
-function canCaptureAssumingEnemy(board, piece, fromRow, fromCol, toRow, toCol) {
-    if (fromRow === toRow && fromCol === toCol) return false;
-    const p = piece.toLowerCase();
-    if (p === 'c') {
-        if (fromRow !== toRow && fromCol !== toCol) return false;
-        const deltaRow = toRow - fromRow;
-        const deltaCol = toCol - fromCol;
-        const stepRow = deltaRow === 0 ? 0 : (deltaRow > 0 ? 1 : -1);
-        const stepCol = deltaCol === 0 ? 0 : (deltaCol > 0 ? 1 : -1);
-        let cnt = 0;
-        let r = fromRow + stepRow, c = fromCol + stepCol;
-        while (r !== toRow || c !== toCol) {
-            if (board[r][c] !== EMPTY) cnt++;
-            r += stepRow; c += stepCol;
-        }
-        return cnt === 1;
-    }
-    const saved = board[toRow][toCol];
-    board[toRow][toCol] = EMPTY;
-    const ok = isValidAttack(board, piece, fromRow, fromCol, toRow, toCol);
-    board[toRow][toCol] = saved;
-    return ok;
+function ttProbe(state, depth, alpha, beta) {
+  const i = ttIndex(state);
+  if (i < 0) return null;
+  const meta = ttMeta[i] | 0;
+  const d = meta >>> 2;
+  if (d < depth) return null;
+  const flag = meta & 3;
+  const v = ttVal[i] | 0;
+  if (flag === TT_EXACT) return v;
+  if (flag === TT_LOWER && v >= beta) return v;
+  if (flag === TT_UPPER && v <= alpha) return v;
+  return null;
 }
 
-function buildCaptureMap(board, attackerColor) {
-    const cap = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            const piece = board[r][c];
-            if (!piece) continue;
-            if (getPieceColor(piece) !== attackerColor) continue;
-            for (let tr = 0; tr < ROWS; tr++) {
-                for (let tc = 0; tc < COLS; tc++) {
-                    const target = board[tr][tc];
-                    if (!target) continue;
-                    if (sameColor(piece, target)) continue;
-                    if (isValidAttack(board, piece, r, c, tr, tc)) {
-                        cap[tr][tc] = true;
-                    }
-                }
-            }
-        }
-    }
-    return cap;
+function ttStore(state, depth, flag, value, best) {
+  const i = state.hashKey & TT_MASK;
+  const meta = ttMeta[i] | 0;
+  const d = meta >>> 2;
+  if (ttKey[i] !== state.hashKey || ttLock[i] !== state.hashLock || depth >= d) {
+    ttKey[i] = state.hashKey;
+    ttLock[i] = state.hashLock;
+    ttVal[i] = value | 0;
+    ttMove[i] = best & 0xFFFF;
+    ttMeta[i] = ((depth & 0x3FFF) << 2) | (flag & 3);
+  }
 }
 
-function buildPressureMap(board, attackerColor) {
-    const press = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            const piece = board[r][c];
-            if (!piece) continue;
-            if (getPieceColor(piece) !== attackerColor) continue;
-            for (let tr = 0; tr < ROWS; tr++) {
-                for (let tc = 0; tc < COLS; tc++) {
-                    if (r === tr && c === tc) continue;
-                    if (canCaptureAssumingEnemy(board, piece, r, c, tr, tc)) {
-                        press[tr][tc] = true;
-                    }
-                }
-            }
+function negamax(bArr, side, depth, alpha, beta, state, ply, killers, history) {
+  if (abort) return 0;
+  if (depth <= 0) return quiescence(bArr, side, alpha, beta, state, ply, killers, history);
+  if (shouldStop()) return 0;
+
+  const inCheck = isAttacked(bArr, side === 1 ? state.redKing : state.blackKing, -side, state.redKing, state.blackKing);
+  let ext = inCheck ? 1 : 0;
+  depth += ext;
+
+  const ttCut = ttProbe(state, depth, alpha, beta);
+  if (ttCut !== null) return ttCut;
+  const ttM = ttBestMove(state);
+  const alphaOrig = alpha;
+
+  const moves = [];
+  genMoves(bArr, side, state, moves);
+  if (moves.length === 0) return inCheck ? -999999 + ply : 0;
+
+  let killer1 = killers[ply * 2] || 0;
+  let killer2 = killers[ply * 2 + 1] || 0;
+
+  moves.sort((a,b) => {
+    if (ttM && a === ttM) return -1;
+    if (ttM && b === ttM) return 1;
+    const ca = bArr[a & 0x7F] !== EMPTY;
+    const cb = bArr[b & 0x7F] !== EMPTY;
+    if (ca && cb) return mvvLvaScore(bArr, b) - mvvLvaScore(bArr, a);
+    if (ca !== cb) return cb - ca;
+    if (a === killer1) return -1;
+    if (b === killer1) return 1;
+    if (a === killer2) return -1;
+    if (b === killer2) return 1;
+    const ha = history[(a>>>8)&0x7F] || 0;
+    const hb = history[(b>>>8)&0x7F] || 0;
+    return hb - ha;
+  });
+
+  let best = -9999999;
+  let bestMove = moves[0] || 0;
+  let didCut = false;
+  let moveIndex = 0;
+  for (let i=0; i<moves.length; i++) {
+    const m = moves[i];
+    const cap = bArr[m & 0x7F];
+    const u = makeMove(bArr, m, state);
+    const gives = isAttacked(bArr, side === 1 ? state.blackKing : state.redKing, side, state.redKing, state.blackKing);
+    let newDepth = depth - 1;
+    if (newDepth >= 3 && cap === EMPTY && !gives && moveIndex >= 4) newDepth -= 1;
+    const score = -negamax(bArr, -side, newDepth, -beta, -alpha, state, ply + 1, killers, history);
+    unmakeMove(bArr, u, state);
+    moveIndex++;
+    if (abort) return 0;
+    if (score > best) { best = score; bestMove = m; }
+    if (score > alpha) {
+      alpha = score;
+      if (alpha >= beta) {
+        if (cap === EMPTY) {
+          killers[ply * 2 + 1] = killers[ply * 2];
+          killers[ply * 2] = m;
+          history[(m>>>8)&0x7F] = (history[(m>>>8)&0x7F] || 0) + depth * depth;
         }
+        ttStore(state, depth, TT_LOWER, alpha, bestMove);
+        didCut = true;
+        break;
+      }
     }
-    return press;
+  }
+  if (!abort) {
+    if (!didCut) {
+      const flag = best <= alphaOrig ? TT_UPPER : TT_EXACT;
+      ttStore(state, depth, flag, best, bestMove);
+    }
+  }
+  return best;
 }
 
-function evaluateBoard(b) {
-    let score = 0;
+function quiescence(bArr, side, alpha, beta, state, ply, killers, history) {
+  if (abort) return 0;
+  if (shouldStop()) return 0;
+  let stand = evaluate(bArr, side, state);
+  if (stand >= beta) return beta;
+  if (stand > alpha) alpha = stand;
 
-    function buildInfluenceMap(board, color) {
-        const inf = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
-        function mark(r, c) {
-            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
-            inf[r][c] = true;
-        }
-        for (let r=0; r<ROWS; r++) {
-            for (let c=0; c<COLS; c++) {
-                const piece = board[r][c];
-                if (!piece) continue;
-                if (getPieceColor(piece) !== color) continue;
-                const p = piece.toLowerCase();
+  const moves = [];
+  genMoves(bArr, side, state, moves);
+  const caps = [];
+  for (let i=0; i<moves.length; i++) {
+    const m = moves[i];
+    if (bArr[m & 0x7F] !== EMPTY) caps.push(m);
+  }
+  caps.sort((a,b) => mvvLvaScore(bArr,b) - mvvLvaScore(bArr,a));
 
-                if (p === 'r') {
-                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-                    for (let i=0; i<dirs.length; i++) {
-                        const dr = dirs[i][0], dc = dirs[i][1];
-                        let rr = r + dr, cc = c + dc;
-                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
-                            mark(rr, cc);
-                            if (board[rr][cc] !== EMPTY) break;
-                            rr += dr; cc += dc;
-                        }
-                    }
-                    continue;
-                }
-
-                if (p === 'c') {
-                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-                    for (let i=0; i<dirs.length; i++) {
-                        const dr = dirs[i][0], dc = dirs[i][1];
-                        let rr = r + dr, cc = c + dc;
-                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && board[rr][cc] === EMPTY) {
-                            rr += dr; cc += dc;
-                        }
-                        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
-                        rr += dr; cc += dc;
-                        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
-                            if (board[rr][cc] !== EMPTY) {
-                                mark(rr, cc);
-                                break;
-                            }
-                            rr += dr; cc += dc;
-                        }
-                    }
-                    continue;
-                }
-
-                if (p === 'n') {
-                    const candidates = [
-                        [-2,-1,-1,0],[-2,1,-1,0], [2,-1,1,0],[2,1,1,0],
-                        [-1,-2,0,-1],[1,-2,0,-1], [-1,2,0,1],[1,2,0,1]
-                    ];
-                    for (let i=0; i<candidates.length; i++) {
-                        const dr = candidates[i][0], dc = candidates[i][1];
-                        const lr = candidates[i][2], lc = candidates[i][3];
-                        const legRow = r + lr, legCol = c + lc;
-                        if (legRow < 0 || legRow >= ROWS || legCol < 0 || legCol >= COLS) continue;
-                        if (board[legRow][legCol] !== EMPTY) continue;
-                        mark(r + dr, c + dc);
-                    }
-                    continue;
-                }
-
-                if (p === 'b') {
-                    const dirs = [[-2,-2],[-2,2],[2,-2],[2,2]];
-                    for (let i=0; i<dirs.length; i++) {
-                        const dr = dirs[i][0], dc = dirs[i][1];
-                        const eyeRow = r + dr/2, eyeCol = c + dc/2;
-                        const toRow = r + dr, toCol = c + dc;
-                        if (toRow < 0 || toRow >= ROWS || toCol < 0 || toCol >= COLS) continue;
-                        if (board[eyeRow][eyeCol] !== EMPTY) continue;
-                        if (color === 'red' && toRow < 5) continue;
-                        if (color === 'black' && toRow > 4) continue;
-                        mark(toRow, toCol);
-                    }
-                    continue;
-                }
-
-                if (p === 'a') {
-                    const dirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
-                    for (let i=0; i<dirs.length; i++) {
-                        const toRow = r + dirs[i][0], toCol = c + dirs[i][1];
-                        if (!inPalace(color, toRow, toCol)) continue;
-                        mark(toRow, toCol);
-                    }
-                    continue;
-                }
-
-                if (p === 'k') {
-                    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-                    for (let i=0; i<dirs.length; i++) {
-                        const toRow = r + dirs[i][0], toCol = c + dirs[i][1];
-                        if (!inPalace(color, toRow, toCol)) continue;
-                        mark(toRow, toCol);
-                    }
-                    continue;
-                }
-
-                if (p === 'p') {
-                    if (color === 'red') {
-                        mark(r - 1, c);
-                        if (r <= 4) { mark(r, c - 1); mark(r, c + 1); }
-                    } else {
-                        mark(r + 1, c);
-                        if (r >= 5) { mark(r, c - 1); mark(r, c + 1); }
-                    }
-                }
-            }
-        }
-        return inf;
-    }
-
-    const redInf = buildInfluenceMap(b, 'red');
-    const blackInf = buildInfluenceMap(b, 'black');
-
-    let redKing, blackKing;
-    for (let r=0; r<ROWS; r++) {
-        for (let c=0; c<COLS; c++) {
-            const p = b[r][c];
-            if (p === 'K') redKing = [r,c];
-            if (p === 'k') blackKing = [r,c];
-        }
-    }
-
-    function mobilityCountForPiece(board, r, c, piece) {
-        const tmp = [];
-        generatePseudoMovesForPiece(board, r, c, piece, tmp);
-        return tmp.length;
-    }
-
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            const p = b[r][c];
-            if (!p) continue;
-            const color = getPieceColor(p);
-            const base = pieceValues[p] || 0;
-            let val = base + getPosBonus(p, r, c);
-            val += mobilityCountForPiece(b, r, c, p) * 2;
-
-            const attacked = color === 'red' ? blackInf[r][c] : redInf[r][c];
-            const defended = color === 'red' ? redInf[r][c] : blackInf[r][c];
-            if (attacked) val -= defended ? base * 0.16 : base * 0.38;
-            if (defended && !attacked) val += base * 0.03;
-
-            score += (color === 'red') ? val : -val;
-        }
-    }
-
-    if (redKing) {
-        const kr = redKing[0], kc = redKing[1];
-        let danger = 0;
-        for (let r = Math.max(0, kr - 1); r <= Math.min(ROWS - 1, kr + 1); r++) {
-            for (let c = Math.max(0, kc - 1); c <= Math.min(COLS - 1, kc + 1); c++) {
-                if (blackInf[r][c] && inPalace('red', r, c)) danger++;
-            }
-        }
-        score -= danger * 60;
-    }
-    if (blackKing) {
-        const kr = blackKing[0], kc = blackKing[1];
-        let danger = 0;
-        for (let r = Math.max(0, kr - 1); r <= Math.min(ROWS - 1, kr + 1); r++) {
-            for (let c = Math.max(0, kc - 1); c <= Math.min(COLS - 1, kc + 1); c++) {
-                if (redInf[r][c] && inPalace('black', r, c)) danger++;
-            }
-        }
-        score += danger * 70;
-    }
-
-    if (isInCheck(b, 'red')) score -= 260;
-    if (isInCheck(b, 'black')) score += 300;
-
-    if (aiStrategy === 'aggressive') score *= 1.08;
-    else if (aiStrategy === 'defensive') score *= 0.93;
-
-    return score;
+  for (let i=0; i<caps.length; i++) {
+    const m = caps[i];
+    const u = makeMove(bArr, m, state);
+    const score = -quiescence(bArr, -side, -beta, -alpha, state, ply + 1, killers, history);
+    unmakeMove(bArr, u, state);
+    if (abort) return 0;
+    if (score >= beta) return beta;
+    if (score > alpha) alpha = score;
+  }
+  return alpha;
 }
 
-function isCheckmate(board, color) {
-    const moves = getAllLegalMoves(board, color);
-    return moves.length === 0;
-}
+function searchBest(inputBoard, side, timeMs, debugMode) {
+  const parsed = parseBoard(inputBoard);
+  const bArr = parsed.b;
+  const state = { redKing: parsed.redKing, blackKing: parsed.blackKing, hashKey: parsed.hashKey, hashLock: parsed.hashLock };
 
-let searchDeadline = 0;
+  const rootMoves = [];
+  genMoves(bArr, side, state, rootMoves);
+  if (rootMoves.length === 0) return { move: null, gameOver: true };
 
-function quiescenceSearch(b, alpha, beta, isMaximizing, depth) {
-    if (searchDeadline && Date.now() >= searchDeadline) {
-        return evaluateBoard(b);
-    }
-    const standPat = evaluateBoard(b);
-    
-    if (isMaximizing) {
-        if (standPat >= beta) return beta;
-        if (alpha < standPat) alpha = standPat;
-    } else {
-        if (standPat <= alpha) return alpha;
-        if (beta > standPat) beta = standPat;
-    }
-    
-    if (depth === 0) return standPat;
-    
-    const color = isMaximizing ? 'red' : 'black';
-    const moves = getAllLegalMoves(b, color);
-    
-    const captureMoves = moves.filter(m => b[m.toRow][m.toCol] !== EMPTY);
-    captureMoves.sort((a, bb) => (pieceValues[b[bb.toRow][bb.toCol]] || 0) - (pieceValues[b[a.toRow][a.toCol]] || 0));
-    
-    if (isMaximizing) {
-        for (let move of captureMoves) {
-            const capturedValue = pieceValues[b[move.toRow][move.toCol]] || 0;
-            if (standPat + capturedValue + 200 < alpha) continue;
+  const killers = new Array(256).fill(0);
+  const history = {};
 
-            const captured = makeMove(b, move);
-            const score = quiescenceSearch(b, alpha, beta, false, depth - 1);
-            unmakeMove(b, move, captured);
-            if (score >= beta) return beta;
-            if (score > alpha) alpha = score;
-        }
-        return alpha;
-    } else {
-        for (let move of captureMoves) {
-            const capturedValue = pieceValues[b[move.toRow][move.toCol]] || 0;
-            if (standPat - capturedValue - 200 > beta) continue;
+  stopTime = Date.now() + timeMs;
+  abort = false;
+  nodes = 0;
 
-            const captured = makeMove(b, move);
-            const score = quiescenceSearch(b, alpha, beta, true, depth - 1);
-            unmakeMove(b, move, captured);
-            if (score <= alpha) return alpha;
-            if (score < beta) beta = score;
-        }
-        return beta;
-    }
-}
+  let bestMove = rootMoves[0];
+  let bestScore = -9999999;
+  let depth = 1;
+  let lastReport = 0;
 
-function withTemporaryMove(board, move, fn) {
-    const piece = board[move.fromRow][move.fromCol];
-    const captured = board[move.toRow][move.toCol];
-    board[move.fromRow][move.fromCol] = EMPTY;
-    board[move.toRow][move.toCol] = piece;
-    const result = fn();
-    board[move.fromRow][move.fromCol] = piece;
-    board[move.toRow][move.toCol] = captured;
-    return result;
-}
+  while (!abort && Date.now() < stopTime) {
+    let alpha = -9999999;
+    let beta = 9999999;
+    let localBestMove = bestMove;
+    let localBestScore = -9999999;
 
-function scoreMoveForOrdering(board, move, moverColor) {
-    let score = 0;
-    const captured = board[move.toRow][move.toCol];
-    if (captured) score += (pieceValues[captured] || 0) * 100;
-    score += getPosBonus(move.piece, move.toRow, move.toCol) - getPosBonus(move.piece, move.fromRow, move.fromCol);
-    const opponent = moverColor === 'red' ? 'black' : 'red';
-    score += withTemporaryMove(board, move, () => isInCheck(board, opponent) ? 50000 : 0);
-    score += withTemporaryMove(board, move, () => {
-        if (isSquareAttacked(board, move.toRow, move.toCol, opponent)) {
-            return -(pieceValues[move.piece] || 0) * 18;
-        }
-        return 0;
+    rootMoves.sort((a,b) => {
+      if (a === bestMove) return -1;
+      if (b === bestMove) return 1;
+      const ca = bArr[a & 0x7F] !== EMPTY;
+      const cb = bArr[b & 0x7F] !== EMPTY;
+      if (ca && cb) return mvvLvaScore(bArr,b) - mvvLvaScore(bArr,a);
+      if (ca !== cb) return cb - ca;
+      return 0;
     });
-    return score;
-}
 
-function minimax(b, depth, alpha, beta, isMaximizing, maxDepth) {
-    if (searchDeadline && Date.now() >= searchDeadline) {
-        return evaluateBoard(b);
+    for (let i=0; i<rootMoves.length; i++) {
+      if (Date.now() >= stopTime) { abort = true; break; }
+      const m = rootMoves[i];
+      if (debugMode && Date.now() - lastReport > 45) {
+        lastReport = Date.now();
+        self.postMessage({ type: 'debug', move: toMoveObj(m, bArr), depth: depth, moveIndex: i, totalMoves: rootMoves.length });
+      }
+      const u = makeMove(bArr, m, state);
+      const score = -negamax(bArr, -side, depth - 1, -beta, -alpha, state, 1, killers, history);
+      unmakeMove(bArr, u, state);
+      if (abort) break;
+      if (score > localBestScore) {
+        localBestScore = score;
+        localBestMove = m;
+      }
+      if (score > alpha) alpha = score;
     }
-    if (depth === 0) {
-        return quiescenceSearch(b, alpha, beta, isMaximizing, 8);
-    }
-    
-    const color = isMaximizing ? 'red' : 'black';
-    let moves = getAllLegalMoves(b, color);
-    
-    if (moves.length === 0) {
-        return isMaximizing ? -100000 - depth : 100000 + depth;
-    }
-    
-    const scored = new Array(moves.length);
-    for (let i = 0; i < moves.length; i++) {
-        scored[i] = { move: moves[i], score: scoreMoveForOrdering(b, moves[i], color) };
-    }
-    scored.sort((a, bb) => bb.score - a.score);
-    moves = scored.map(x => x.move);
-    
-    if (isMaximizing) {
-        let maxEval = -Infinity;
-        for (let move of moves) {
-            const captured = makeMove(b, move);
-            const evalScore = minimax(b, depth - 1, alpha, beta, false, maxDepth);
-            unmakeMove(b, move, captured);
-            maxEval = Math.max(maxEval, evalScore);
-            alpha = Math.max(alpha, evalScore);
-            if (beta <= alpha) break;
-        }
-        return maxEval;
-    } else {
-        let minEval = Infinity;
-        for (let move of moves) {
-            const captured = makeMove(b, move);
-            const evalScore = minimax(b, depth - 1, alpha, beta, true, maxDepth);
-            unmakeMove(b, move, captured);
-            minEval = Math.min(minEval, evalScore);
-            beta = Math.min(beta, evalScore);
-            if (beta <= alpha) break;
-        }
-        return minEval;
-    }
-}
 
-// AI策略
-let aiStrategy = 'normal'; // normal, aggressive, defensive
+    if (!abort) {
+      bestMove = localBestMove;
+      bestScore = localBestScore;
+      depth++;
+      if (depth > 32) break;
+    }
+  }
+
+  return { move: toMoveObj(bestMove, bArr), gameOver: false, bestScore, depth: depth - 1, nodes };
+}
 
 self.onmessage = function(e) {
-    if (e.data.type === 'changeStrategy') {
-        // 改变AI策略
-        if (aiStrategy === 'normal') {
-            aiStrategy = 'aggressive';
-        } else if (aiStrategy === 'aggressive') {
-            aiStrategy = 'defensive';
-        } else {
-            aiStrategy = 'normal';
-        }
-        console.log('AI策略已改变为:', aiStrategy);
-        return;
-    }
-    
-    const { board, difficulty, moveList, computeMode, isHint, debugMode } = e.data;
-    
-    let useGPU = false;
-    if (computeMode === 'gpu' && typeof navigator !== 'undefined' && navigator.gpu) {
-        useGPU = true;
-    }
-
-    const moverColor = isHint ? 'red' : 'black';
-    let moves = getAllLegalMoves(board, moverColor);
-    if (moves.length === 0) {
-        self.postMessage({ move: null, gameOver: true });
-        return;
-    }
-
-    const maxDepthByDifficulty = [3, 4, 5, 6, 7, 8];
-    const baseTimeMsByDifficulty = [220, 420, 700, 1100, 1600, 2300];
-    const maxDepth = maxDepthByDifficulty[Math.max(0, Math.min(5, difficulty))];
-    const timeMs = baseTimeMsByDifficulty[Math.max(0, Math.min(5, difficulty))] * (isHint ? 0.7 : 1);
-
-    searchDeadline = Date.now() + timeMs;
-
-    const scored = new Array(moves.length);
-    for (let i = 0; i < moves.length; i++) {
-        scored[i] = { move: moves[i], score: scoreMoveForOrdering(board, moves[i], moverColor) };
-    }
-    scored.sort((a, bb) => bb.score - a.score);
-    moves = scored.map(x => x.move);
-
-    function sameMove(a, b) {
-        return a && b &&
-            a.fromRow === b.fromRow && a.fromCol === b.fromCol &&
-            a.toRow === b.toRow && a.toCol === b.toCol &&
-            a.piece === b.piece;
-    }
-
-    const chooseBetter = (score, bestScore) => isHint ? (score > bestScore) : (score < bestScore);
-    let bestMoveSoFar = moves[0];
-    let bestScoreSoFar = isHint ? -Infinity : Infinity;
-
-    for (let depth = 1; depth <= maxDepth; depth++) {
-        if (Date.now() >= searchDeadline) break;
-        let depthBestScore = isHint ? -Infinity : Infinity;
-        let depthBestMoves = [];
-
-        for (let i = 0; i < moves.length; i++) {
-            if (Date.now() >= searchDeadline) break;
-            const move = moves[i];
-
-            if (debugMode && depth === maxDepth) {
-                self.postMessage({
-                    type: 'debug',
-                    move: move,
-                    depth: depth,
-                    moveIndex: i,
-                    totalMoves: moves.length
-                });
-            }
-
-            const captured = makeMove(board, move);
-            const score = minimax(board, depth - 1, -Infinity, Infinity, !isHint, depth);
-            unmakeMove(board, move, captured);
-
-            if (chooseBetter(score, depthBestScore)) {
-                depthBestScore = score;
-                depthBestMoves = [move];
-            } else if (score === depthBestScore) {
-                depthBestMoves.push(move);
-            }
-        }
-
-        if (depthBestMoves.length > 0) {
-            bestScoreSoFar = depthBestScore;
-            if (difficulty === 0) {
-                const pick = Math.min(3, depthBestMoves.length);
-                bestMoveSoFar = depthBestMoves[Math.floor(Math.random() * pick)];
-            } else {
-                bestMoveSoFar = depthBestMoves[Math.floor(Math.random() * depthBestMoves.length)];
-            }
-            moves = [bestMoveSoFar, ...moves.filter(m => !sameMove(m, bestMoveSoFar))];
-        }
-    }
-
-    searchDeadline = 0;
-    self.postMessage({ move: bestMoveSoFar, gameOver: false, useGPU: useGPU, bestScore: bestScoreSoFar });
+  const { board, difficulty, isHint, debugMode } = e.data || {};
+  const d = Math.max(0, Math.min(5, difficulty | 0));
+  const timeMsByDifficulty = [2000, 5000, 10000, 20000, 60000, 120000];
+  let timeMs = timeMsByDifficulty[d];
+  if (isHint) timeMs = Math.max(250, (timeMs * 0.55) | 0);
+  const side = isHint ? 1 : -1;
+  const result = searchBest(board, side, timeMs, !!debugMode);
+  self.postMessage({ move: result.move, gameOver: !!result.gameOver, useGPU: false, bestScore: result.bestScore, depth: result.depth, nodes: result.nodes });
 };
 `;
 
@@ -3434,10 +3257,7 @@ self.onmessage = function(e) {
         }
         
         if (frictionCount >= frictionThreshold) {
-            // 检测到反复摩擦，通知AI改变策略
-            if (aiWorker) {
-                aiWorker.postMessage({ type: 'changeStrategy' });
-            }
+            return;
         }
     }
 
@@ -4795,127 +4615,7 @@ self.onmessage = function(e) {
         return score;
     }
 
-    // 历史启发表 - 记录表现好的走法
-    const historyTable = new Array(10).fill(null).map(() => new Array(9).fill(0));
-
-    // 开局库 - 常见的中国象棋开局走法
-    const openingBook = [
-        // 当头炮对屏风马
-        ['炮二平五', '马8进7', '马二进三', '车9平8', '车一平二', '马2进3', '兵七进一', '卒7进1', '马八进七', '象3进5'],
-        // 当头炮对反宫马
-        ['炮二平五', '马2进3', '马二进三', '炮8平6', '车一平二', '马8进7', '炮八平六', '车1平2', '马八进七', '炮2进4'],
-        // 飞相局
-        ['相三进五', '炮8平5', '马二进三', '马8进7', '车一平二', '车9平8', '马八进七', '马2进3', '兵七进一', '卒7进1'],
-        // 士角炮
-        ['炮二平四', '马8进7', '马二进三', '车9平8', '车一平二', '炮8进4', '兵三进一', '炮2平5', '马八进七', '马2进3'],
-        // 仙人指路
-        ['兵七进一', '卒7进1', '马八进七', '马8进7', '炮二平五', '马2进3', '马二进三', '车9平8', '车一平二', '炮8进4']
-    ];
-
-    // 检查是否在开局库中
-    function checkOpeningBook(moveHistory) {
-        if (moveHistory.length < 2 || moveHistory.length > 18) return null;
-        
-        for (let opening of openingBook) {
-            let match = true;
-            for (let i = 0; i < moveHistory.length; i++) {
-                if (moveHistory[i] !== opening[i]) {
-                    match = false;
-                    break;
-                }
-            }
-            if (match && moveHistory.length < opening.length) {
-                return opening[moveHistory.length];
-            }
-        }
-        return null;
-    }
-
-    // 从棋子记谱转换为坐标
-    function notationToMove(notation, board, color) {
-        // 解析走子记录格式：例如 "红炮2进3" 或 "黑车1平2"
-        // 格式：颜色 + 棋子 + 起始位置 + 方向 + 步数
-        const match = notation.match(/(红|黑)([车马炮象士将士象車馬炮卒兵])([一二三四五六七八九1-9])([进退平])([一二三四五六七八九1-9])/);
-        if (!match) return null;
-        
-        const [, moveColor, piece, startPos, direction, step] = match;
-        
-        // 确保颜色匹配
-        if ((moveColor === '红' && color !== 'red') || (moveColor === '黑' && color !== 'black')) {
-            return null;
-        }
-        
-        // 转换棋子类型
-        const pieceMap = {
-            '车': 'R', '马': 'N', '炮': 'C', '象': 'B', '士': 'A', '将': 'K', '兵': 'P',
-            '車': 'r', '馬': 'n', '炮': 'c', '象': 'b', '士': 'a', '士': 'k', '卒': 'p'
-        };
-        
-        const pieceType = pieceMap[piece] || null;
-        if (!pieceType) return null;
-        
-        // 找到起始位置
-        let fromRow, fromCol;
-        const startNum = parseInt(startPos) - 1;
-        
-        if (color === 'red') {
-            // 红方视角：列从右到左1-9
-            fromCol = 8 - startNum;
-            // 查找该列上的指定棋子
-            for (let row = 0; row < 10; row++) {
-                if (board[row][fromCol] === pieceType) {
-                    fromRow = row;
-                    break;
-                }
-            }
-        } else {
-            // 黑方视角：列从右到左1-9
-            fromCol = 8 - startNum;
-            // 查找该列上的指定棋子
-            for (let row = 9; row >= 0; row--) {
-                if (board[row][fromCol] === pieceType) {
-                    fromRow = row;
-                    break;
-                }
-            }
-        }
-        
-        if (fromRow === undefined) return null;
-        
-        // 计算目标位置
-        let toRow, toCol;
-        const stepNum = parseInt(step);
-        
-        switch (direction) {
-            case '进':
-                toRow = color === 'red' ? fromRow + stepNum : fromRow - stepNum;
-                toCol = fromCol;
-                break;
-            case '退':
-                toRow = color === 'red' ? fromRow - stepNum : fromRow + stepNum;
-                toCol = fromCol;
-                break;
-            case '平':
-                toRow = fromRow;
-                toCol = 8 - (parseInt(step) - 1);
-                break;
-            default:
-                return null;
-        }
-        
-        // 验证目标位置是否合法
-        if (toRow < 0 || toRow >= 10 || toCol < 0 || toCol >= 9) {
-            return null;
-        }
-        
-        return {
-            fromRow,
-            fromCol,
-            toRow,
-            toCol,
-            piece: pieceType
-        };
-    }
+    
 
     // 迭代加深搜索
     function minimax(b, depth, alpha, beta, isMaximizing, maxDepth, debugInfo) {
@@ -5205,51 +4905,6 @@ self.onmessage = function(e) {
         };
         }
 
-        // 检查开局库
-        const openingMove = checkOpeningBook(moveList);
-        if (openingMove) {
-            // 如果在开局库中，直接使用开局库的走法
-            const move = notationToMove(openingMove, board, 'black');
-            if (move) {
-                const capturedPiece = board[move.toRow][move.toCol];
-                setTimeout(() => {
-                    isAiThinking = false;
-                    clearInterval(aiTimerInterval);
-                    const totalTime = (Date.now() - aiStartTime) / 1000;
-                    
-                    const notation = generateNotation(move, 'black');
-                    
-                    lastAiMove = { ...move };
-                    
-                    animateMove(move.fromRow, move.fromCol, move.toRow, move.toCol, move.piece, () => {
-                        playSfx(capturedPiece ? 'capture' : 'move');
-                        if (isInCheck(board, 'red')) {
-                            playSfx('check');
-                        }
-                        // 在棋盘更新后保存历史记录
-                        pushHistory(move, notation, capturedPiece);
-                        
-                        moveList.push(notation);
-                        refreshMoveList();
-                        drawBoard();
-
-                        if (isCheckmate(board, 'red')) {
-                            gameOver = true;
-                            gameStatusEl.innerText = 'AI胜利！';
-                            // 保存胜利记录
-                            saveCurrentGame();
-                            const checkmateType = detectCheckmateType(board, 'red');
-                            setTimeout(() => showGameOverModal('ai-win', 'AI绝杀红方，获得胜利！', checkmateType), 500);
-                        } else {
-                            currentPlayer = 'red';
-                            gameStatusEl.innerText = '红方走棋';
-                        }
-                    });
-                }, 500); // 模拟思考时间
-                return;
-            }
-        }
-        
         aiWorker.postMessage({
             board: board,
             difficulty: difficulty,
@@ -5257,49 +4912,6 @@ self.onmessage = function(e) {
             computeMode: computeMode,
             debugMode: gameSettings.debugMode
         });
-    }
-
-    // 从开局库中获取走法
-    function checkOpeningBook(moveHistory) {
-        const openingBook = [
-            // 当头炮对屏风马
-            ['炮二平五', '马8进7', '马二进三', '车9平8', '车一平二', '马2进3', '兵七进一', '卒7进1', '马八进七', '象3进5'],
-            // 当头炮对反宫马
-            ['炮二平五', '马2进3', '马二进三', '炮8平6', '车一平二', '马8进7', '炮八平六', '车1平2', '马八进七', '炮2进4'],
-            // 飞相局
-            ['相三进五', '炮8平5', '马二进三', '马8进7', '车一平二', '车9平8', '马八进七', '马2进3', '兵七进一', '卒7进1'],
-            // 士角炮
-            ['炮二平四', '马8进7', '马二进三', '车9平8', '车一平二', '炮8进4', '兵三进一', '炮2平5', '马八进七', '马2进3'],
-            // 仙人指路
-            ['兵七进一', '卒7进1', '马八进七', '马8进7', '炮二平五', '马2进3', '马二进三', '车9平8', '车一平二', '炮8进4']
-        ];
-        
-        if (moveHistory.length < 2 || moveHistory.length > 18) return null;
-        
-        for (let opening of openingBook) {
-            let match = true;
-            for (let i = 0; i < moveHistory.length; i++) {
-                if (moveHistory[i] !== opening[i]) {
-                    match = false;
-                    break;
-                }
-            }
-            if (match && moveHistory.length < opening.length) {
-                return opening[moveHistory.length];
-            }
-        }
-        return null;
-    }
-
-    // 从棋子记谱转换为坐标
-    function notationToMove(notation, board, color) {
-        const moves = getAllLegalMoves(board, color);
-        for (let i = 0; i < moves.length; i++) {
-            const m = moves[i];
-            const n = generateNotation(m, color);
-            if (n === notation) return m;
-        }
-        return null;
     }
 
     // 获取棋子名称
